@@ -3,6 +3,8 @@ import os
 from typing import Any, List, Tuple
 
 import psycopg
+from psycopg.rows import dict_row
+
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
@@ -23,7 +25,7 @@ def read_from_sql_file(file_path: str) -> str:
 def execute_sql_query(sql_file_path: str) -> List[Tuple[Any, ...]]:
     """Helper function to execute SQL queries"""
     try:
-        with psycopg.connect(con_str) as conn:
+        with psycopg.connect(con_str, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(read_from_sql_file(sql_file_path))
                 return cur.fetchall()
