@@ -2,6 +2,9 @@
 
 A Model Context Protocol (MCP) server that provides access to your TeslaMate database, allowing AI assistants to query Tesla vehicle data and analytics.
 
+![teslamate-mcp](assets/teslamcp.gif)
+
+
 ## Overview
 
 This MCP server connects to your TeslaMate PostgreSQL database and exposes various tools to retrieve Tesla vehicle information, driving statistics, charging data, battery health, efficiency metrics, and location analytics. It's designed to work with MCP-compatible AI assistants like Claude Desktop, enabling natural language queries about your Tesla data.
