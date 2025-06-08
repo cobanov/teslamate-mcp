@@ -1,0 +1,17 @@
+[project]
+name = "teslamate-mcp"
+version = "0.1.0"
+description = "A Model Context Protocol (MCP) server that provides access to your TeslaMate database, allowing AI assistants to query Tesla vehicle data and analytics."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Mert Cobanov", email = "mertcobanov@gmail.com"},
+]
+keywords = ["tesla", "teslamate", "mcp", "model-context-protocol", "ai", "assistant", "vehicle-data"]
+dependencies = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "mcp[cli]>=1.9.3",
+    "psycopg[binary]>=3.2.9",
+]
