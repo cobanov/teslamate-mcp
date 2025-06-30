@@ -181,9 +181,14 @@ For connecting to a remote server:
 ```json
 {
   "mcpServers": {
-    "teslamate-remote": {
-      "url": "http://your-server:8888/mcp",
-      "transport": "streamable_http"
+    "TeslaMate": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://your-private-server:8888/mcp",
+        "--allow-http"
+      ]
     }
   }
 }
@@ -194,11 +199,18 @@ With authentication enabled:
 ```json
 {
   "mcpServers": {
-    "teslamate-remote": {
-      "url": "http://your-server:8888/mcp",
-      "transport": "streamable_http",
-      "headers": {
-        "Authorization": "Bearer your-secret-bearer-token-here"
+    "TeslaMate": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://your-private-server:8888/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer <secret bearer token>"
       }
     }
   }
@@ -207,7 +219,7 @@ With authentication enabled:
 
 ## Usage
 
-### Running the Server
+### Running the Server (STDIO)
 
 ```bash
 uv run python main.py
