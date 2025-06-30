@@ -18,6 +18,9 @@ services:
       
       # Optional: Set log level
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Optional: Bearer token authentication
+      AUTH_TOKEN: ${AUTH_TOKEN:-}
     
     # Health check to ensure the service is responding
     healthcheck:

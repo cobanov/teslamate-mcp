@@ -45,7 +45,7 @@ This MCP server connects to your TeslaMate PostgreSQL database and exposes vario
 
 ### Option 2: Docker Deployment (Remote Access)
 
-For remote deployment using Docker, see [REMOTE_DEPLOYMENT.md](REMOTE_DEPLOYMENT.md). Quick start:
+For remote deployment using Docker. Quick start:
 
 ```bash
 # Clone and navigate to the repository
@@ -63,6 +63,55 @@ docker-compose up -d
 
 The remote server will be available at:
 - Streamable HTTP: `http://localhost:8888/mcp`
+
+#### Configuring Authentication (Optional)
+
+To secure your remote MCP server with bearer token authentication:
+
+1. Set a bearer token in your `.env` file:
+   ```env
+   AUTH_TOKEN=your-secret-bearer-token-here
+   ```
+
+   Generate a secure token:
+   ```bash
+   # Use the provided token generator
+   python3 generate_token.py
+   
+   # Or generate manually with openssl
+   openssl rand -base64 32
+   
+   # Or use any other method to create a secure random string
+   ```
+
+2. When connecting from MCP clients, include the Authorization header:
+   ```json
+   {
+     "mcpServers": {
+       "teslamate-remote": {
+         "url": "http://your-server:8888/mcp",
+         "transport": "streamable_http",
+         "headers": {
+           "Authorization": "Bearer your-secret-bearer-token-here"
+         }
+       }
+     }
+   }
+   ```
+
+3. Or use curl for testing:
+   ```bash
+   curl -H "Authorization: Bearer your-secret-bearer-token-here" \
+        http://localhost:8888/mcp
+   ```
+
+#### Security Considerations
+
+- **Use HTTPS in production**: Bearer tokens are sent in plain text. Always use HTTPS/TLS in production environments.
+- **Strong tokens**: Use long, random tokens (at least 32 characters).
+- **Environment variables**: Never commit tokens to version control. Use environment variables or secrets management.
+- **Network security**: Consider using a VPN or restricting access by IP address for additional security.
+- **Token rotation**: Regularly rotate your bearer tokens.
 
 ## Available Tools
 
@@ -109,6 +158,8 @@ To use this server with Claude Desktop, add the following to your MCP configurat
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
+#### Local Configuration (stdio transport)
+
 ```json
 {
   "mcpServers": {
@@ -117,6 +168,37 @@ To use this server with Claude Desktop, add the following to your MCP configurat
       "args": ["run", "python", "/path/to/teslamate-mcp/main.py"],
       "env": {
         "DATABASE_URL": "postgresql://username:password@hostname:port/teslamate"
+      }
+    }
+  }
+}
+```
+
+#### Remote Configuration (streamable HTTP transport)
+
+For connecting to a remote server:
+
+```json
+{
+  "mcpServers": {
+    "teslamate-remote": {
+      "url": "http://your-server:8888/mcp",
+      "transport": "streamable_http"
+    }
+  }
+}
+```
+
+With authentication enabled:
+
+```json
+{
+  "mcpServers": {
+    "teslamate-remote": {
+      "url": "http://your-server:8888/mcp",
+      "transport": "streamable_http",
+      "headers": {
+        "Authorization": "Bearer your-secret-bearer-token-here"
       }
     }
   }

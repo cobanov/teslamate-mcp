@@ -79,6 +79,15 @@ start() {
         print_status "Service is running!"
         print_status "MCP server is available at:"
         print_status "  - Endpoint: http://localhost:8888/mcp"
+        
+        # Check if authentication is enabled
+        if [ -f .env ]; then
+            source .env
+            if [ ! -z "$AUTH_TOKEN" ]; then
+                print_status "  - Auth required: Bearer token configured"
+                print_status "  - Use header: Authorization: Bearer $AUTH_TOKEN"
+            fi
+        fi
     else
         print_error "Service failed to start. Check logs with: docker-compose logs"
         exit 1
@@ -116,6 +125,14 @@ try:
     conn = psycopg.connect(os.getenv('DATABASE_URL'))
     print('✓ Database connection successful!')
     conn.close()
+    
+    # Check authentication status
+    auth_token = os.getenv('AUTH_TOKEN')
+    if auth_token:
+        print(f'✓ Bearer token authentication enabled')
+        print(f'  Authorization header: Bearer {auth_token}')
+    else:
+        print('⚠ Bearer token authentication not configured')
 except Exception as e:
     print('✗ Database connection failed:', str(e))
 "

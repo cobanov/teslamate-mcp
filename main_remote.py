@@ -20,6 +20,8 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
+from starlette.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 load_dotenv()
 
@@ -50,6 +52,46 @@ def load_db_schema() -> List[Dict[str, str]]:
 
 # Cache the database schema
 DB_SCHEMA = load_db_schema()
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    """Bearer token authentication middleware for the MCP server"""
+    
+    def __init__(self, app, auth_token: Optional[str] = None):
+        super().__init__(app)
+        self.auth_token = auth_token
+    
+    async def dispatch(self, request, call_next):
+        # Skip auth if no token is configured
+        if not self.auth_token:
+            return await call_next(request)
+        
+        # Skip auth for non-MCP endpoints
+        if not request.url.path.startswith("/mcp"):
+            return await call_next(request)
+        
+        # Check Authorization header
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Authorization required"},
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        # Validate token
+        try:
+            provided_token = auth_header.split(" ", 1)[1]
+            if provided_token != self.auth_token:
+                raise ValueError("Invalid token")
+        except (IndexError, ValueError):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Invalid token"},
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        
+        # Continue with the request
+        return await call_next(request)
 
 def validate_sql_query(sql: str) -> tuple[bool, Optional[str]]:
     """
@@ -142,11 +184,18 @@ async def execute_sql_query(sql_file_path: str) -> List[Dict[str, Any]]:
     default=False,
     help="Enable JSON responses instead of SSE streams",
 )
+@click.option(
+    "--auth-token",
+    default=None,
+    help="Bearer authentication token (optional)",
+    envvar="AUTH_TOKEN",
+)
 def main(
     port: int,
     host: str,
     log_level: str,
     json_response: bool,
+    auth_token: str | None,
 ) -> int:
     global app_context
     
@@ -467,6 +516,11 @@ def main(
         ],
         lifespan=lifespan,
     )
+    
+    # Add bearer auth middleware if token is provided
+    if auth_token:
+        starlette_app.add_middleware(BearerAuthMiddleware, auth_token=auth_token)
+        logger.info("Bearer token authentication enabled")
     
     # Run with uvicorn
     uvicorn.run(starlette_app, host=host, port=port)
