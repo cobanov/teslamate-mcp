@@ -1,0 +1,47 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+REMOTE_DEPLOYMENT.md
+assets/
+
+# Environment files
+.env
+.env.*
+env.example
+
+# Development files
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Test files
+tests/
+test_*.py
+
+# Logs directory (will be mounted as volume)
+logs/ 
