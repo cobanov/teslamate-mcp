@@ -28,7 +28,7 @@ print_warning() {
 check_requirements() {
     print_status "Checking requirements..."
     
-    if ! command -v docker &> /dev/null; then
+    if ! which docker >& /dev/null; then
         print_error "Docker is not installed. Please install Docker first."
         exit 1
     fi
