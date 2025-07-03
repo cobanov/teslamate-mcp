@@ -1,12 +1,11 @@
 import logging
 import os
-from typing import Any, List, Tuple
+from typing import Any, Dict, List
 
 import psycopg
-from psycopg.rows import dict_row
-
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from psycopg.rows import dict_row
 
 load_dotenv()
 
@@ -22,7 +21,7 @@ def read_from_sql_file(file_path: str) -> str:
         return file.read()
 
 
-def execute_sql_query(sql_file_path: str) -> List[Tuple[Any, ...]]:
+def execute_sql_query(sql_file_path: str) -> List[Dict[str, Any]]:
     """Helper function to execute SQL queries"""
     try:
         with psycopg.connect(con_str, row_factory=dict_row) as conn:
@@ -35,7 +34,7 @@ def execute_sql_query(sql_file_path: str) -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_all_charging_sessions_summary() -> List[Tuple[Any, ...]]:
+def get_all_charging_sessions_summary() -> List[Dict[str, Any]]:
     """
     Get the summary of all charging sessions for each car.
     """
@@ -43,7 +42,7 @@ def get_all_charging_sessions_summary() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_average_efficiency_by_temperature() -> List[Tuple[Any, ...]]:
+def get_average_efficiency_by_temperature() -> List[Dict[str, Any]]:
     """
     Get the average efficiency by temperature for each car.
     """
@@ -51,7 +50,7 @@ def get_average_efficiency_by_temperature() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_basic_car_information() -> List[Tuple[Any, ...]]:
+def get_basic_car_information() -> List[Dict[str, Any]]:
     """
     Get the basic car information for each car.
     """
@@ -59,7 +58,7 @@ def get_basic_car_information() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_battery_degradation_over_time() -> List[Tuple[Any, ...]]:
+def get_battery_degradation_over_time() -> List[Dict[str, Any]]:
     """
     Get the battery degradation over time for each car.
     """
@@ -67,7 +66,7 @@ def get_battery_degradation_over_time() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_battery_health_summary() -> List[Tuple[Any, ...]]:
+def get_battery_health_summary() -> List[Dict[str, Any]]:
     """
     Get the battery health summary for each car.
     """
@@ -75,7 +74,7 @@ def get_battery_health_summary() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_charging_by_location() -> List[Tuple[Any, ...]]:
+def get_charging_by_location() -> List[Dict[str, Any]]:
     """
     Get the charging by location for each car.
     """
@@ -83,7 +82,7 @@ def get_charging_by_location() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_current_car_status() -> List[Tuple[Any, ...]]:
+def get_current_car_status() -> List[Dict[str, Any]]:
     """
     Get the current car status for each car.
     """
@@ -91,15 +90,15 @@ def get_current_car_status() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_daily_battery_usage_patterns() -> List[Tuple[Any, ...]]:
+def get_daily_battery_usage_patterns() -> List[Dict[str, Any]]:
     """
     Get the daily battery usage patterns for each car.
     """
-    return execute_sql_query("queries/daily_battery_usage_patterns.sql")
+    return execute_sql_query("queries/daily_battery_usage.sql")
 
 
 @mcp.tool()
-def get_daily_driving_patterns() -> List[Tuple[Any, ...]]:
+def get_daily_driving_patterns() -> List[Dict[str, Any]]:
     """
     Get the daily driving patterns for each car.
     """
@@ -107,7 +106,7 @@ def get_daily_driving_patterns() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_drive_summary_per_day() -> List[Tuple[Any, ...]]:
+def get_drive_summary_per_day() -> List[Dict[str, Any]]:
     """
     Get the drive summary per day for each car.
     """
@@ -115,7 +114,7 @@ def get_drive_summary_per_day() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_efficiency_by_month_and_temperature() -> List[Tuple[Any, ...]]:
+def get_efficiency_by_month_and_temperature() -> List[Dict[str, Any]]:
     """
     Get the efficiency by month and temperature for each car.
     """
@@ -123,7 +122,7 @@ def get_efficiency_by_month_and_temperature() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_longest_drives_by_distance() -> List[Tuple[Any, ...]]:
+def get_longest_drives_by_distance() -> List[Dict[str, Any]]:
     """
     Get the longest drives by distance for each car.
     """
@@ -131,7 +130,7 @@ def get_longest_drives_by_distance() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_monthly_driving_summary() -> List[Tuple[Any, ...]]:
+def get_monthly_driving_summary() -> List[Dict[str, Any]]:
     """
     Get the monthly driving summary for each car.
     """
@@ -139,7 +138,7 @@ def get_monthly_driving_summary() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_most_visited_locations() -> List[Tuple[Any, ...]]:
+def get_most_visited_locations() -> List[Dict[str, Any]]:
     """
     Get the most visited locations for each car.
     """
@@ -147,7 +146,7 @@ def get_most_visited_locations() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_software_update_history() -> List[Tuple[Any, ...]]:
+def get_software_update_history() -> List[Dict[str, Any]]:
     """
     Get the software update history for each car.
     """
@@ -155,15 +154,15 @@ def get_software_update_history() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_tire_pressure_weekly_trends() -> List[Tuple[Any, ...]]:
+def get_tire_pressure_weekly_trends() -> List[Dict[str, Any]]:
     """
     Get the tire pressure weekly trends for each car.
     """
-    return execute_sql_query("queries/tire_pressure_weekly_trends.sql")
+    return execute_sql_query("queries/tire_pressure_weekly_trend.sql")
 
 
 @mcp.tool()
-def get_total_distance_and_efficiency() -> List[Tuple[Any, ...]]:
+def get_total_distance_and_efficiency() -> List[Dict[str, Any]]:
     """
     Get the total distance and efficiency for each car.
     """
@@ -171,7 +170,7 @@ def get_total_distance_and_efficiency() -> List[Tuple[Any, ...]]:
 
 
 @mcp.tool()
-def get_unusual_power_consumption() -> List[Tuple[Any, ...]]:
+def get_unusual_power_consumption() -> List[Dict[str, Any]]:
     """
     Get the unusual power consumption for each car.
     """
