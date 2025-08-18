@@ -3,6 +3,10 @@
 
 A Model Context Protocol (MCP) server that provides access to your TeslaMate database, allowing AI assistants to query Tesla vehicle data and analytics.
 
+<a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="teslamate-mcp MCP server" />
+</a>
+
 ![teslamate-mcp](assets/teslamcp.gif)
 
 
