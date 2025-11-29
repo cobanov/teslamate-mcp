@@ -1,54 +1,39 @@
 """Test script for TeslaMate MCP Server"""
 
 import asyncio
+import json
 
 from fastmcp import Client
 
 
-async def test_tools():
-    """Test various MCP tools"""
+async def test_tool(client: Client, tool_name: str):
+    """Test a single tool"""
+    result = await client.call_tool(tool_name)
+    data = result.structured_content["result"]
+    count = len(data)
+
+    print(f"  ✓ {tool_name:<35} ({count} result{'s' if count != 1 else ''})")
+    if data:
+        print(f"    {json.dumps(data[0], indent=2, default=str)}")
+
+
+async def test_server():
+    """Test TeslaMate MCP Server tools"""
     client = Client("main.py")
 
     async with client:
-        print("=" * 70)
-        print("Testing TeslaMate MCP Server")
-        print("=" * 70)
+        print("TeslaMate MCP Server - Test Suite\n")
 
-        # Test 1: Basic car information
-        print("\n[Test 1] Getting basic car information...")
-        try:
-            result = await client.call_tool("get_basic_car_information")
-            print("✓ Success - Basic car information retrieved")
-            print(result)
-        except Exception as e:
-            print(f"✗ Failed: {e}")
+        tools = [
+            "get_basic_car_information",
+            "get_current_car_status",
+            "get_battery_health_summary",
+        ]
 
-        print("\n" + "=" * 70)
-
-        # Test 2: Current car status
-        print("\n[Test 2] Getting current car status...")
-        try:
-            result = await client.call_tool("get_current_car_status")
-            print("✓ Success - Current car status retrieved")
-            print(result)
-        except Exception as e:
-            print(f"✗ Failed: {e}")
-
-        print("\n" + "=" * 70)
-
-        # Test 3: Battery health summary
-        print("\n[Test 3] Getting battery health summary...")
-        try:
-            result = await client.call_tool("get_battery_health_summary")
-            print("✓ Success - Battery health summary retrieved")
-            print(result)
-        except Exception as e:
-            print(f"✗ Failed: {e}")
-
-        print("\n" + "=" * 70)
-        print("All tests completed!")
-        print("=" * 70)
+        for tool in tools:
+            await test_tool(client, tool)
+            print()
 
 
 if __name__ == "__main__":
-    asyncio.run(test_tools())
+    asyncio.run(test_server())
