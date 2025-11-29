@@ -1,6 +1,6 @@
 [project]
 name = "teslamate-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Model Context Protocol (MCP) server that provides access to your TeslaMate database, allowing AI assistants to query Tesla vehicle data and analytics."
 readme = "README.md"
 license = {text = "MIT"}
