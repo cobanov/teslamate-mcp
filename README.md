@@ -1,20 +1,50 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cobanov-teslamate-mcp-badge.png)](https://mseep.ai/app/cobanov-teslamate-mcp)
-
 # TeslaMate MCP Server
-[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
 
 A Model Context Protocol (MCP) server that provides access to your TeslaMate database, allowing AI assistants to query Tesla vehicle data and analytics.
 
-<a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="teslamate-mcp MCP server" />
-</a>
-
 ![teslamate-mcp](assets/teslamcp.gif)
-
 
 ## Overview
 
-This MCP server connects to your TeslaMate PostgreSQL database and exposes various tools to retrieve Tesla vehicle information, driving statistics, charging data, battery health, efficiency metrics, and location analytics. It's designed to work with MCP-compatible AI assistants like Claude Desktop, enabling natural language queries about your Tesla data.
+This MCP server connects to your TeslaMate PostgreSQL database and exposes various tools to retrieve Tesla vehicle information, driving statistics, charging data, battery health, efficiency metrics, and location analytics. It's designed to work with MCP-compatible AI assistants like Claude Desktop and Cursor IDE, enabling natural language queries about your Tesla data.
+
+## Features
+
+- 🚗 **18 Predefined Queries** - Battery health, efficiency, charging, driving patterns, and more
+- 🔍 **Custom SQL Support** - Execute safe SELECT queries with built-in validation
+- 🗄️ **Database Schema Access** - Explore your TeslaMate database structure
+- 🔒 **Bearer Token Authentication** - Optional secure access control
+- 🌐 **Dual Transport Modes** - Local (stdio) and remote (HTTP) connections
+- 🏗️ **Modular Architecture** - Clean, maintainable, and extensible code structure
+
+## Project Structure
+
+```
+teslamate-mcp/
+├── src/
+│   ├── config.py          # Configuration
+│   ├── database.py        # DB operations
+│   ├── tools.py           # Tool registry
+│   └── validators.py       # SQL validation
+│       ├── __init__.py          # Package initialization
+│       ├── config.py            # Configuration management
+│       ├── database.py          # Database operations
+│       ├── tools.py             # Tool definitions
+│       └── validators.py        # SQL validation utilities
+├── queries/                     # SQL query files (18 files)
+├── data/                        # Data files
+│   └── all_db_info.json        # Database schema information
+├── utils/                       # Utility scripts
+│   └── generate_token.py       # Bearer token generator
+├── main.py                      # STDIO transport (local)
+├── main_remote.py               # HTTP transport (remote)
+├── test_server.py               # Test script
+├── Dockerfile                   # Docker image definition
+├── docker-compose.yml           # Docker deployment config
+├── pyproject.toml              # Project metadata
+├── env.example                 # Environment variables template
+└── README.md                   # This file
+```
 
 ## Prerequisites
 
@@ -46,29 +76,30 @@ This MCP server connects to your TeslaMate PostgreSQL database and exposes vario
    ```
 
 3. Create a `.env` file in the project root:
+
    ```env
    DATABASE_URL=postgresql://username:password@hostname:port/teslamate
    ```
 
 ### Option 2: Docker Deployment (Remote Access)
 
-For remote deployment using Docker. Quick start:
+For remote deployment using Docker:
 
 ```bash
 # Clone and navigate to the repository
 git clone https://github.com/yourusername/teslamate-mcp.git
 cd teslamate-mcp
 
-# Run the deployment script
-./deploy.sh deploy
-
-# Or manually:
+# Setup environment
 cp env.example .env
 # Edit .env with your database credentials
+
+# Build and start
 docker-compose up -d
 ```
 
 The remote server will be available at:
+
 - Streamable HTTP: `http://localhost:8888/mcp`
 
 #### Configuring Authentication (Optional)
@@ -76,22 +107,23 @@ The remote server will be available at:
 To secure your remote MCP server with bearer token authentication:
 
 1. Set a bearer token in your `.env` file:
+
    ```env
    AUTH_TOKEN=your-secret-bearer-token-here
    ```
 
    Generate a secure token:
+
    ```bash
    # Use the provided token generator
-   python3 generate_token.py
+   python3 utils/generate_token.py
    
    # Or generate manually with openssl
    openssl rand -base64 32
-   
-   # Or use any other method to create a secure random string
    ```
 
 2. When connecting from MCP clients, include the Authorization header:
+
    ```json
    {
      "mcpServers": {
@@ -106,25 +138,12 @@ To secure your remote MCP server with bearer token authentication:
    }
    ```
 
-3. Or use curl for testing:
-   ```bash
-   curl -H "Authorization: Bearer your-secret-bearer-token-here" \
-        http://localhost:8888/mcp
-   ```
-
-#### Security Considerations
-
-- **Use HTTPS in production**: Bearer tokens are sent in plain text. Always use HTTPS/TLS in production environments.
-- **Strong tokens**: Use long, random tokens (at least 32 characters).
-- **Environment variables**: Never commit tokens to version control. Use environment variables or secrets management.
-- **Network security**: Consider using a VPN or restricting access by IP address for additional security.
-- **Token rotation**: Regularly rotate your bearer tokens.
-
 ## Available Tools
 
 The MCP server provides 20 tools for querying your TeslaMate data:
 
 ### Pre-defined Query Tools
+
 1. `get_basic_car_information` - Basic vehicle details (VIN, model, name, color, etc.)
 2. `get_current_car_status` - Current state, location, battery level, and temperature
 3. `get_software_update_history` - Timeline of software updates
@@ -145,6 +164,7 @@ The MCP server provides 20 tools for querying your TeslaMate data:
 18. `get_most_visited_locations` - Frequently visited places
 
 ### Custom Query Tools
+
 19. `get_database_schema` - Returns complete database schema (tables, columns, data types)
 20. `run_sql` - Execute custom SELECT queries with safety validation
     - Only SELECT statements allowed
@@ -156,16 +176,51 @@ The MCP server provides 20 tools for querying your TeslaMate data:
 
 ### Environment Variables
 
-- `DATABASE_URL`: PostgreSQL connection string for your TeslaMate database
+Create a `.env` file based on `env.example`:
+
+```env
+# Database connection (REQUIRED)
+DATABASE_URL=postgresql://username:password@hostname:port/teslamate
+
+# Bearer token for authentication (OPTIONAL)
+AUTH_TOKEN=
+
+# Custom queries directory (OPTIONAL)
+QUERIES_DIR=queries
+```
 
 ### MCP Client Configuration
 
-To use this server with Claude Desktop, add the following to your MCP configuration file:
+#### Cursor IDE
+
+Access through Cursor's settings (⌘+, → search for "MCP"):
+
+**Local Configuration (stdio transport):**
+
+```json
+{
+  "mcpServers": {
+    "teslamate": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/teslamate-mcp",
+        "run",
+        "main.py"
+      ]
+    }
+  }
+}
+```
+
+**Note**: If you have a `.env` file, the `DATABASE_URL` will be loaded automatically.
+
+#### Claude Desktop
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-#### Local Configuration (stdio transport)
+**Local Configuration (stdio transport):**
 
 ```json
 {
@@ -181,9 +236,7 @@ To use this server with Claude Desktop, add the following to your MCP configurat
 }
 ```
 
-#### Remote Configuration (streamable HTTP transport)
-
-For connecting to a remote server:
+**Remote Configuration (streamable HTTP transport):**
 
 ```json
 {
@@ -201,7 +254,7 @@ For connecting to a remote server:
 }
 ```
 
-With authentication enabled:
+With authentication:
 
 ```json
 {
@@ -226,15 +279,27 @@ With authentication enabled:
 
 ## Usage
 
-### Running the Server (STDIO)
+### Running the Server
+
+**Local (STDIO):**
 
 ```bash
 uv run python main.py
 ```
 
+**Remote (HTTP):**
+
+```bash
+# Using Python directly
+python main_remote.py --host 0.0.0.0 --port 8888
+
+# Using Docker
+docker-compose up -d
+```
+
 ### Example Queries
 
-Once configured with an MCP client, you can ask natural language questions organized by category:
+Once configured with an MCP client, you can ask natural language questions:
 
 #### Basic Vehicle Information
 
@@ -247,20 +312,17 @@ Once configured with an MCP client, you can ask natural language questions organ
 - "How is my battery health?"
 - "Show me battery degradation over time"
 - "What are my daily battery usage patterns?"
-- "How are my tire pressures trending?"
 
 #### Driving Analytics
 
 - "Show me my monthly driving summary"
 - "What are my daily driving patterns?"
 - "What are my longest drives by distance?"
-- "What's my total distance driven and efficiency?"
 
 #### Efficiency Analysis
 
 - "How does temperature affect my efficiency?"
 - "Show me efficiency trends by month and temperature"
-- "Are there any unusual power consumption patterns?"
 
 #### Charging and Location Data
 
@@ -273,15 +335,61 @@ Once configured with an MCP client, you can ask natural language questions organ
 - "Show me the database schema"
 - "Run a SQL query to find drives longer than 100km"
 - "Query the average charging power by location"
-- "Find all charging sessions at superchargers"
 
-**Note**: The `run_sql` tool only allows SELECT queries. All data modification operations (INSERT, UPDATE, DELETE, DROP, etc.) are strictly forbidden for safety.
+**Note**: The `run_sql` tool only allows SELECT queries. All data modification operations are strictly forbidden for safety.
 
-## Adding New Queries
+## Development
 
-1. Create a new SQL file in the `queries/` directory
-2. Add a corresponding tool function in `main.py`
-3. Follow the existing pattern for error handling and database connections
+### Project Structure Overview
+
+The project follows a modular architecture:
+
+- **`src/`** - Core modules containing all shared logic
+  - **`config.py`** - Configuration management and environment variables
+  - **`database.py`** - Database connection pooling and query execution
+  - **`tools.py`** - Tool definitions registry (eliminates duplication)
+  - **`validators.py`** - SQL query validation and security
+  
+- **`main.py`** - STDIO transport server for local connections
+- **`main_remote.py`** - HTTP transport server for remote connections
+- **`queries/`** - SQL query files (one per tool)
+
+### Adding New Queries
+
+1. Create a new SQL file in the `queries/` directory:
+
+   ```sql
+   -- queries/my_new_query.sql
+   SELECT * FROM my_table;
+   ```
+
+2. Add the tool definition in `src/tools.py`:
+
+   ```python
+   ToolDefinition(
+       name="get_my_new_data",
+       description="Description of what this query returns",
+       sql_file="my_new_query.sql",
+   ),
+   ```
+
+3. Restart the server - the new tool will be automatically registered!
+
+### Testing
+
+Run the test script to verify your setup:
+
+```bash
+python test_server.py
+```
+
+## Security Considerations
+
+- **Use HTTPS in production**: Bearer tokens are sent in plain text. Always use HTTPS/TLS in production.
+- **Strong tokens**: Use long, random tokens (at least 32 characters).
+- **Environment variables**: Never commit tokens to version control.
+- **Network security**: Consider using a VPN or IP restrictions.
+- **SQL validation**: Only SELECT queries are allowed; all modification operations are blocked.
 
 ## License
 
@@ -291,5 +399,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [TeslaMate](https://github.com/teslamate-org/teslamate) - Tesla data logging software
 - [Model Context Protocol](https://modelcontextprotocol.io/) - Protocol for AI-tool integration
+
+## Contributing
 
 For bugs and feature requests, please open an issue on GitHub.
