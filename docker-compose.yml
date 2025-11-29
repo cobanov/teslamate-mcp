@@ -2,58 +2,11 @@ version: "3.8"
 
 services:
   teslamate-mcp:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: teslamate-mcp:latest
+    build: .
     container_name: teslamate-mcp
     restart: unless-stopped
     ports:
       - "8888:8888"
     environment:
-      # Database connection - Replace with your TeslaMate database credentials
-      DATABASE_URL: ${DATABASE_URL:-postgresql://teslamate:password@teslamate-db:5432/teslamate}
-
-      # Server configuration (no longer needs MCP_TRANSPORT)
-
-      # Optional: Set log level
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-
-      # Optional: Bearer token authentication
+      DATABASE_URL: ${DATABASE_URL}
       AUTH_TOKEN: ${AUTH_TOKEN:-}
-
-    # Health check to ensure the service is responding
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import socket; s=socket.socket(); s.connect(('localhost', 8888)); s.close()",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-    # Optional: Add to teslamate network if running alongside TeslaMate
-    # networks:
-    #   - teslamate
-
-    # Optional: Volume for persistent logs
-    volumes:
-      - ./logs:/app/logs:rw
-
-    # Resource limits (adjust based on your needs)
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 512M
-        reservations:
-          cpus: "0.25"
-          memory: 256M
-# Optional: Define networks if connecting to existing TeslaMate setup
-# networks:
-#   teslamate:
-#     external: true
