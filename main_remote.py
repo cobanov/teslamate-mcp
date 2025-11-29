@@ -19,10 +19,10 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 
-from src.teslamate_mcp.config import Config
-from src.teslamate_mcp.database import DatabaseManager, create_async_pool
-from src.teslamate_mcp.tools import TOOL_DEFINITIONS, get_tool_by_name
-from src.teslamate_mcp.validators import validate_sql_query
+from src.config import Config
+from src.database import DatabaseManager, create_async_pool
+from src.tools import TOOL_DEFINITIONS, get_tool_by_name
+from src.validators import validate_sql_query
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +89,6 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
     help="Host to listen on",
 )
 @click.option(
-    "--log-level",
-    default="INFO",
-    help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
-)
-@click.option(
     "--json-response",
     is_flag=True,
     default=False,
@@ -108,17 +103,10 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
 def main(
     port: int,
     host: str,
-    log_level: str,
     json_response: bool,
     auth_token: str | None,
 ) -> int:
     global app_context
-
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
 
     # Load configuration
     config = Config.from_env()
