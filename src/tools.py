@@ -1,7 +1,6 @@
 """Tool definitions for TeslaMate MCP server"""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
 
 
 @dataclass
@@ -114,9 +113,3 @@ def get_tool_by_name(name: str) -> ToolDefinition:
         if tool.name == name:
             return tool
     raise ValueError(f"Unknown tool: {name}")
-
-
-def get_all_tool_names() -> List[str]:
-    """Get all tool names"""
-    return [tool.name for tool in TOOL_DEFINITIONS]
-

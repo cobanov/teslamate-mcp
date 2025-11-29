@@ -23,7 +23,6 @@ class Config:
 
     database_url: str
     auth_token: Optional[str] = None
-    log_level: str = "INFO"
     queries_dir: str = "queries"
 
     @classmethod
@@ -36,13 +35,5 @@ class Config:
         return cls(
             database_url=database_url,
             auth_token=os.getenv("AUTH_TOKEN"),
-            log_level=os.getenv("LOG_LEVEL", "INFO"),
             queries_dir=os.getenv("QUERIES_DIR", "queries"),
         )
-
-    def get_logger(self, name: str) -> logging.Logger:
-        """Get a logger with the configured log level"""
-        logger = logging.getLogger(name)
-        logger.setLevel(getattr(logging, self.log_level.upper()))
-        return logger
-
