@@ -1,16 +1,17 @@
 """TeslaMate MCP Server - STDIO Transport (Local)"""
 
+import logging
 from typing import Any, Dict, List
 
 from mcp.server.fastmcp import FastMCP
 
-from src.teslamate_mcp.config import Config
-from src.teslamate_mcp.database import DatabaseManager
-from src.teslamate_mcp.tools import TOOL_DEFINITIONS
+from src.config import Config
+from src.database import DatabaseManager
+from src.tools import TOOL_DEFINITIONS
 
 # Initialize configuration and database manager
 config = Config.from_env()
-logger = config.get_logger(__name__)
+logger = logging.getLogger(__name__)
 db_manager = DatabaseManager(config)
 
 # Initialize MCP server
