@@ -20,6 +20,10 @@ A Model Context Protocol (MCP) server that connects your TeslaMate database to A
 - 🔒 **Optional Authentication** - Bearer token support for remote deployments
 - 🏗️ **Modular Architecture** - Clean, maintainable codebase
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/cobanov-teslamate-mcp).
+
 ## Prerequisites
 
 - [TeslaMate](https://github.com/teslamate-org/teslamate) running with PostgreSQL
