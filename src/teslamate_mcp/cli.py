@@ -8,12 +8,20 @@ import sys
 
 import click
 import uvicorn
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 from . import __version__
 from .auth import BearerAuthMiddleware
 from .config import load_settings
 from .server import create_server
 from .tools import discover_predefined_tools
+
+
+async def _health(_request: Request) -> JSONResponse:
+    """Liveness probe used by Docker HEALTHCHECK and any external monitor."""
+    return JSONResponse({"status": "ok", "version": __version__})
 
 
 def _configure_logging(level: str) -> None:
@@ -67,8 +75,10 @@ def http(host: str | None, port: int | None, auth_token: str | None, json_respon
     _configure_logging(settings.log_level)
     mcp = create_server(settings)
 
-    # FastMCP exposes a Starlette app for streamable-http; we wrap it for auth.
+    # FastMCP exposes a Starlette app for streamable-http; we wrap it for auth
+    # and mount a small /health probe alongside it.
     app = mcp.streamable_http_app()
+    app.router.routes.append(Route("/health", _health, methods=["GET"]))
     if json_response:
         # The FastMCP attribute lives on the session manager; set it before serving.
         mcp.settings.streamable_http_json_response = True  # type: ignore[attr-defined]
