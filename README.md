@@ -115,37 +115,6 @@ uv run teslamate-mcp gen-token
 - `get_database_schema` — current TeslaMate schema (one row per column)
 - `run_sql(query)` — execute a custom `SELECT` or `WITH … SELECT`
 
-## Custom SQL safety model
-
-`run_sql` does **not** rely on a regex blacklist alone. The actual guarantees come from the database:
-
-1. **Regex pre-check** rejects multi-statement input and non-`SELECT`/`WITH` leading keywords (cheap fail-fast).
-2. **PostgreSQL `READ ONLY` transaction** with `SET LOCAL statement_timeout`, `lock_timeout`, and `idle_in_transaction_session_timeout`. The transaction is rolled back unconditionally.
-3. **Automatic LIMIT** — if you omit `LIMIT`, your query is wrapped in `SELECT * FROM (<your query>) AS _capped LIMIT 1000`.
-4. **Recommended**: connect with a dedicated read-only PostgreSQL role for defense in depth.
-
-## Project layout
-
-```text
-teslamate-mcp/
-├── src/teslamate_mcp/
-│   ├── cli.py            # click subcommands
-│   ├── server.py         # FastMCP factory + lifespan
-│   ├── config.py         # pydantic-settings
-│   ├── db.py             # async pool + read-only helper
-│   ├── auth.py           # bearer middleware
-│   ├── schema.py         # information_schema introspection
-│   ├── serialization.py  # Decimal/datetime → JSON
-│   ├── tools/
-│   │   ├── registry.py     # discover .sql + .toml pairs
-│   │   ├── custom_sql.py   # run_sql
-│   │   └── schema_tool.py  # get_database_schema
-│   └── queries/          # 18 .sql files, each with a sibling .toml
-├── tests/                # pytest, testcontainers-postgres
-├── Dockerfile            # multi-stage
-└── docker-compose.yml
-```
-
 ## Adding a new query
 
 1. Drop a SELECT into `src/teslamate_mcp/queries/your_query.sql`.
