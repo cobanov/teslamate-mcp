@@ -91,4 +91,5 @@ def _register_one(mcp: FastMCP, tool: PredefinedTool, annotations: ToolAnnotatio
 
     handler.__name__ = tool.name
     handler.__doc__ = tool.description
+    handler.__annotations__["ctx"] = Context
     mcp.tool(name=tool.name, description=tool.description, annotations=annotations)(handler)

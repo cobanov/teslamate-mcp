@@ -32,11 +32,6 @@ def register_schema_tool(mcp: FastMCP) -> None:
         "writing custom SQL with `run_sql`."
     )
 
-    @mcp.tool(
-        name="get_database_schema",
-        description=description,
-        annotations=annotations,
-    )
     async def get_database_schema(ctx: Context) -> list[dict[str, Any]]:
         lifespan_ctx = ctx.request_context.lifespan_context
         if lifespan_ctx.schema is None:
@@ -44,3 +39,10 @@ def register_schema_tool(mcp: FastMCP) -> None:
             lifespan_ctx.schema = await load_schema(lifespan_ctx.pool)
         await ctx.info(f"Returning schema for {len(lifespan_ctx.schema)} columns")
         return lifespan_ctx.schema
+
+    get_database_schema.__annotations__["ctx"] = Context
+    mcp.tool(
+        name="get_database_schema",
+        description=description,
+        annotations=annotations,
+    )(get_database_schema)
