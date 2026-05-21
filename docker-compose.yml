@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   teslamate-mcp:
     build: .
@@ -10,3 +8,4 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       AUTH_TOKEN: ${AUTH_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
