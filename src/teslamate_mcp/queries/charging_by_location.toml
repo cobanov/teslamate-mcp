@@ -1,0 +1,2 @@
+name = "get_charging_by_location"
+description = "Get the charging by location for each car. Shows charging patterns and statistics grouped by location."

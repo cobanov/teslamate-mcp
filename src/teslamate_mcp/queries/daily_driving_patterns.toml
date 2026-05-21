@@ -1,0 +1,2 @@
+name = "get_daily_driving_patterns"
+description = "Get the daily driving patterns for each car. Shows driving habits and patterns by day of week and time."

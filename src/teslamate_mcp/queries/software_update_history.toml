@@ -1,0 +1,2 @@
+name = "get_software_update_history"
+description = "Get the software update history for each car. Tracks firmware updates and version changes over time."

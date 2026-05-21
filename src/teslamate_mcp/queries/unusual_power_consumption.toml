@@ -1,0 +1,2 @@
+name = "get_unusual_power_consumption"
+description = "Get the unusual power consumption for each car. Identifies anomalies in power usage that might indicate issues."

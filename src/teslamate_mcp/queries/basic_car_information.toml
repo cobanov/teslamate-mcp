@@ -1,0 +1,2 @@
+name = "get_basic_car_information"
+description = "Get the basic car information for each car. Returns VIN, model, firmware version, and other vehicle details."

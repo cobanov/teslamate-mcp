@@ -1,0 +1,2 @@
+name = "get_most_visited_locations"
+description = "Get the most visited locations for each car. Shows frequently visited places with visit counts and durations."

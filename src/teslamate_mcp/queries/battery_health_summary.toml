@@ -1,0 +1,2 @@
+name = "get_battery_health_summary"
+description = "Get the battery health summary for each car. Provides current battery health status and statistics."

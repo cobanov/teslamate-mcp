@@ -1,0 +1,2 @@
+name = "get_current_car_status"
+description = "Get the current car status for each car. Returns real-time vehicle status including location, battery level, and state."

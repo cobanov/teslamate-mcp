@@ -1,0 +1,2 @@
+name = "get_average_efficiency_by_temperature"
+description = "Get the average efficiency by temperature for each car. Helps understand how temperature affects vehicle efficiency."

@@ -1,0 +1,2 @@
+name = "get_daily_battery_usage_patterns"
+description = "Get the daily battery usage patterns for each car. Analyzes battery consumption patterns throughout the day."

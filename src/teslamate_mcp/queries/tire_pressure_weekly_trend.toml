@@ -1,0 +1,2 @@
+name = "get_tire_pressure_weekly_trends"
+description = "Get the tire pressure weekly trends for each car. Monitors tire pressure changes and patterns by week."

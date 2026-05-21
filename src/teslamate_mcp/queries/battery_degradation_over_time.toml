@@ -1,0 +1,2 @@
+name = "get_battery_degradation_over_time"
+description = "Get the battery degradation over time for each car. Tracks battery health metrics and capacity changes."
