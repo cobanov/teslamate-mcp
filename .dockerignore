@@ -3,7 +3,9 @@
 .gitignore
 
 # Documentation
-README.md
+# NOTE: README.md must stay in the build context because pyproject.toml
+# references it via `readme = "README.md"` and hatchling reads it at
+# wheel-build time inside the builder stage.
 REMOTE_DEPLOYMENT.md
 assets/
 
