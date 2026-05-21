@@ -2,8 +2,14 @@
 
 ![TeslaMate MCP Server](assets/teslamcp.gif)
 
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cobanov-teslamate-mcp-badge.png)](https://mseep.ai/app/cobanov-teslamate-mcp)
-[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
+[![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github)](https://github.com/cobanov/teslamate-mcp/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-cobanov%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![MseeP.ai Security Assessment](https://mseep.net/pr/cobanov-teslamate-mcp-badge.png)](https://mseep.ai/app/cobanov-teslamate-mcp)
+[![Archestra Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
 
 <a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="teslamate-mcp MCP server" />
@@ -13,11 +19,13 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes
 
 ## Features
 
-- **18 predefined analytics queries** — battery health, charging, driving patterns, efficiency, locations, more
-- **Custom read-only SQL** — `run_sql` runs inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and an automatic row cap
-- **Live schema introspection** — `get_database_schema` reads `information_schema` at runtime, no stale JSON
+- **20 tools** — 18 predefined analytics queries (battery, charging, driving, efficiency, locations) plus `run_sql` and `get_database_schema`
+- **6 prompts** — one-click workflows for battery health, driving summary, charging behaviour, anomaly hunting, weather efficiency, and a quick status report
+- **2 resources** — `teslamate://queries` and `teslamate://queries/{name}` for catalog browsing without invoking a tool
+- **Hardened `run_sql`** — runs inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and an automatic row cap
+- **Live schema introspection** — `get_database_schema` reads `information_schema` at runtime; no stale JSON checked into the repo
 - **Two transports, one binary** — `teslamate-mcp stdio` for local clients, `teslamate-mcp http` for remote
-- **Bearer-token auth** with timing-safe comparison for the HTTP transport
+- **Bearer-token auth** with timing-safe comparison; `/health` probe for liveness checks
 - **`Decimal → float` JSON serialization** so language models see numbers, not strings
 
 ## Requirements
@@ -71,7 +79,13 @@ cp env.example .env
 docker compose up -d
 ```
 
-The server listens on `http://localhost:8888/mcp`.
+The MCP endpoint is at `http://localhost:8888/mcp` and a liveness probe is exposed at `http://localhost:8888/health`.
+
+A prebuilt multi-arch image (`linux/amd64`, `linux/arm64`) is also published to GHCR on every tagged release:
+
+```bash
+docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/cobanov/teslamate-mcp:latest
+```
 
 ## Configuration
 
