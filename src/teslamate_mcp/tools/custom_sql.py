@@ -101,7 +101,6 @@ def register_custom_sql(
         "`get_database_schema` first to learn the available tables and columns."
     )
 
-    @mcp.tool(name="run_sql", description=description, annotations=annotations)
     async def run_sql(
         ctx: Context,
         query: str = Field(
@@ -126,3 +125,6 @@ def register_custom_sql(
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         await ctx.info(f"run_sql returned {len(rows)} row(s) in {elapsed_ms}ms")
         return rows
+
+    run_sql.__annotations__["ctx"] = Context
+    mcp.tool(name="run_sql", description=description, annotations=annotations)(run_sql)

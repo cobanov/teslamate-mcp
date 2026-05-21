@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from teslamate_mcp.config import Settings
+from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.registry import discover_predefined_tools
 
 
@@ -37,3 +39,21 @@ def test_malformed_sidecar_raises(tmp_path: Path) -> None:
     (tmp_path / "q.toml").write_text('name = "x"\n', encoding="utf-8")  # missing description
     with pytest.raises(ValueError, match="description"):
         discover_predefined_tools(tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_tool_schemas_do_not_expose_context_argument() -> None:
+    settings = Settings(database_url="postgresql://teslamate:secret@example.test/teslamate")  # type: ignore[call-arg]
+    mcp = create_server(settings)
+
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    for name in [
+        "get_basic_car_information",
+        "get_database_schema",
+        "run_sql",
+    ]:
+        schema = tools[name].inputSchema
+        assert "ctx" not in schema.get("properties", {})
+        assert "ctx" not in schema.get("required", [])
+    assert tools["run_sql"].inputSchema["required"] == ["query"]
