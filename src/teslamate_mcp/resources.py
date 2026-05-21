@@ -27,9 +27,7 @@ def register_resources(mcp: FastMCP, tools: list[PredefinedTool]) -> None:
         mime_type="application/json",
     )
     async def queries_index() -> str:
-        index = [
-            {"name": t.name, "description": t.description, "source": t.source} for t in tools
-        ]
+        index = [{"name": t.name, "description": t.description, "source": t.source} for t in tools]
         return json.dumps(index, indent=2)
 
     @mcp.resource(

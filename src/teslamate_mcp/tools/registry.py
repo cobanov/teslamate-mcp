@@ -84,7 +84,10 @@ def register_predefined_tools(mcp: FastMCP, tools: list[PredefinedTool]) -> None
 def _register_one(mcp: FastMCP, tool: PredefinedTool, annotations: ToolAnnotations) -> None:
     async def handler(ctx: Context) -> list[dict[str, Any]]:
         pool = ctx.request_context.lifespan_context.pool
-        return await fetch_all(pool, tool.sql)
+        await ctx.info(f"Running {tool.name} ({tool.source})")
+        rows = await fetch_all(pool, tool.sql)
+        await ctx.info(f"{tool.name} returned {len(rows)} row(s)")
+        return rows
 
     handler.__name__ = tool.name
     handler.__doc__ = tool.description

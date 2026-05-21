@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -109,7 +110,19 @@ def register_custom_sql(
             min_length=1,
         ),
     ) -> list[dict[str, Any]]:
-        validate_sql(query)
+        try:
+            validate_sql(query)
+        except SqlValidationError as exc:
+            await ctx.warning(f"run_sql rejected query: {exc}")
+            raise
         capped = enforce_limit(query, row_limit)
         pool = ctx.request_context.lifespan_context.pool
-        return await fetch_readonly(pool, capped, statement_timeout_ms)
+
+        await ctx.info(
+            f"run_sql executing {len(query)}-char query (timeout {statement_timeout_ms}ms)"
+        )
+        start = time.perf_counter()
+        rows = await fetch_readonly(pool, capped, statement_timeout_ms)
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+        await ctx.info(f"run_sql returned {len(rows)} row(s) in {elapsed_ms}ms")
+        return rows

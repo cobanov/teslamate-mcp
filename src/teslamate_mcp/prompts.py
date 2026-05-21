@@ -29,7 +29,7 @@ def register_prompts(mcp: FastMCP) -> None:
             "4. Estimate expected degradation for this model/age and flag any "
             "deviation. Recommend next steps if degradation is faster than "
             "typical (e.g. avoid frequent supercharging, keep SoC between "
-            "20–80%)."
+            "20-80%)."
         )
 
     @mcp.prompt(
