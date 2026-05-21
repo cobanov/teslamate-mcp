@@ -13,6 +13,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from .config import Settings
 from .db import build_pool
+from .prompts import register_prompts
 from .resources import register_resources
 from .schema import load_schema
 from .tools import (
@@ -70,8 +71,9 @@ def create_server(settings: Settings) -> FastMCP:
         row_limit=settings.custom_sql_row_limit,
     )
     register_resources(mcp, tools)
+    register_prompts(mcp)
     logger.info(
-        "Registered %d predefined tools + run_sql + get_database_schema + 2 resources",
+        "Registered %d predefined tools + run_sql + get_database_schema + 2 resources + 6 prompts",
         len(tools),
     )
 
