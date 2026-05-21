@@ -54,24 +54,19 @@ async def fetch_readonly(
 
     async with pool.connection() as conn:
         await conn.set_autocommit(False)
-        async with conn.transaction(force_rollback=True):
-            async with conn.cursor() as cur:
-                await cur.execute("SET TRANSACTION READ ONLY")
-                await cur.execute(
-                    sql.SQL("SET LOCAL statement_timeout = {ms}").format(
-                        ms=sql.Literal(stmt_ms)
-                    )
+        async with conn.transaction(force_rollback=True), conn.cursor() as cur:
+            await cur.execute("SET TRANSACTION READ ONLY")
+            await cur.execute(
+                sql.SQL("SET LOCAL statement_timeout = {ms}").format(ms=sql.Literal(stmt_ms))
+            )
+            await cur.execute(
+                sql.SQL("SET LOCAL lock_timeout = {ms}").format(ms=sql.Literal(lock_ms))
+            )
+            await cur.execute(
+                sql.SQL("SET LOCAL idle_in_transaction_session_timeout = {ms}").format(
+                    ms=sql.Literal(stmt_ms)
                 )
-                await cur.execute(
-                    sql.SQL("SET LOCAL lock_timeout = {ms}").format(
-                        ms=sql.Literal(lock_ms)
-                    )
-                )
-                await cur.execute(
-                    sql.SQL("SET LOCAL idle_in_transaction_session_timeout = {ms}").format(
-                        ms=sql.Literal(stmt_ms)
-                    )
-                )
-                await cur.execute(query)
-                rows = await cur.fetchall()
+            )
+            await cur.execute(query)
+            rows = await cur.fetchall()
     return rows_to_jsonable(rows)

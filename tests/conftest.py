@@ -22,9 +22,8 @@ try:  # pragma: no cover - import guarded so unit tests run without Docker
 except ImportError:  # pragma: no cover
     _HAS_TESTCONTAINERS = False
 
-from teslamate_mcp.db import build_pool
 from teslamate_mcp.config import Settings
-
+from teslamate_mcp.db import build_pool
 
 _SETUP_SQL = """
 DROP TABLE IF EXISTS demo_cars;
@@ -52,7 +51,7 @@ def postgres_container():
     try:
         container = PostgresContainer("postgres:16-alpine")
         container.start()
-    except Exception as exc:  # noqa: BLE001 — broad on purpose, any docker issue → skip
+    except Exception as exc:
         pytest.skip(f"Docker is not available: {exc}")
     try:
         yield container
