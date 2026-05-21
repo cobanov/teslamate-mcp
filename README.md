@@ -1,21 +1,20 @@
+<div align="center">
+
 # TeslaMate MCP Server
 
-![TeslaMate MCP Server](assets/teslamcp.gif)
-
-[![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github)](https://github.com/cobanov/teslamate-mcp/releases)
-[![GHCR](https://img.shields.io/badge/ghcr.io-cobanov%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp)
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![MseeP.ai Security Assessment](https://mseep.net/pr/cobanov-teslamate-mcp-badge.png)](https://mseep.ai/app/cobanov-teslamate-mcp)
-[![Archestra Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
-
-<a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="teslamate-mcp MCP server" />
-</a>
+<img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes your [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to MCP-aware AI clients (Claude Desktop, Cursor, etc.) over either stdio or streamable HTTP.
+
+[![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-cobanov%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/github/license/cobanov/teslamate-mcp)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Archestra Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
+
+</div>
 
 ## Features
 
@@ -153,3 +152,13 @@ uv run pytest                    # tests (Docker-backed integration tests skip i
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Featured in
+
+<a href="https://mseep.ai/app/cobanov-teslamate-mcp">
+  <img src="https://mseep.net/pr/cobanov-teslamate-mcp-badge.png" alt="MseeP.ai security audit" width="280" />
+</a>
+&nbsp;
+<a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
+  <img src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="Glama MCP catalog" width="280" height="148" />
+</a>
