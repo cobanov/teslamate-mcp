@@ -22,6 +22,10 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.12-slim AS runtime
 
+LABEL org.opencontainers.image.source="https://github.com/cobanov/teslamate-mcp" \
+      org.opencontainers.image.description="MCP server exposing the TeslaMate PostgreSQL database to AI assistants." \
+      org.opencontainers.image.licenses="MIT"
+
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
