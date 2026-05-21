@@ -3,191 +3,170 @@
 ![TeslaMate MCP Server](assets/teslamcp.gif)
 
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cobanov-teslamate-mcp-badge.png)](https://mseep.ai/app/cobanov-teslamate-mcp)
-
 [![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/cobanov/teslamate-mcp)](https://archestra.ai/mcp-catalog/cobanov__teslamate-mcp)
 
 <a href="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/@cobanov/teslamate-mcp/badge" alt="teslamate-mcp MCP server" />
 </a>
 
-A Model Context Protocol (MCP) server that connects your TeslaMate database to AI assistants, enabling natural language queries about your Tesla data.
+A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes your [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to MCP-aware AI clients (Claude Desktop, Cursor, etc.) over either stdio or streamable HTTP.
 
 ## Features
 
-- 🚗 **18 Predefined Queries** - Battery health, efficiency, charging, driving patterns, and more
-- 🔍 **Custom SQL Support** - Execute safe SELECT queries with built-in validation
-- 🗄️ **Database Schema Access** - Explore your TeslaMate database structure
-- 🔒 **Optional Authentication** - Bearer token support for remote deployments
-- 🏗️ **Modular Architecture** - Clean, maintainable codebase
+- **18 predefined analytics queries** — battery health, charging, driving patterns, efficiency, locations, more
+- **Custom read-only SQL** — `run_sql` runs inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and an automatic row cap
+- **Live schema introspection** — `get_database_schema` reads `information_schema` at runtime, no stale JSON
+- **Two transports, one binary** — `teslamate-mcp stdio` for local clients, `teslamate-mcp http` for remote
+- **Bearer-token auth** with timing-safe comparison for the HTTP transport
+- **`Decimal → float` JSON serialization** so language models see numbers, not strings
 
-## Prerequisites
+## Requirements
 
-- [TeslaMate](https://github.com/teslamate-org/teslamate) running with PostgreSQL
-- Python 3.11+ (for local) or Docker (for remote)
+- TeslaMate already running against PostgreSQL
+- Python 3.11+ for a local install, or Docker for a remote deployment
 
-## Quick Start
-
-### Local Setup (Cursor/Claude Desktop)
+## Install
 
 ```bash
 git clone https://github.com/cobanov/teslamate-mcp.git
 cd teslamate-mcp
 cp env.example .env
-# Edit .env with your DATABASE_URL
+# Edit .env — at minimum, set DATABASE_URL
 uv sync
 ```
 
-Configure your MCP client:
+## CLI
+
+The `teslamate-mcp` console script has four subcommands:
+
+```bash
+teslamate-mcp stdio                          # local (Cursor / Claude Desktop)
+teslamate-mcp http [--host] [--port]         # remote (HTTP / SSE)
+teslamate-mcp gen-token                      # produce an AUTH_TOKEN value
+teslamate-mcp list-tools                     # diagnostic: list registered tools
+```
+
+`python -m teslamate_mcp <subcommand>` works too.
+
+## Local use (stdio)
+
+Configure your MCP client to launch the stdio server. Example for Cursor or Claude Desktop:
 
 ```json
 {
   "mcpServers": {
     "teslamate": {
       "command": "uv",
-      "args": ["--directory", "/path/to/teslamate-mcp", "run", "main.py"]
+      "args": ["--directory", "/path/to/teslamate-mcp", "run", "teslamate-mcp", "stdio"]
     }
   }
 }
 ```
 
-### Remote Setup (Docker)
+## Remote use (Docker)
 
 ```bash
-git clone https://github.com/cobanov/teslamate-mcp.git
-cd teslamate-mcp
 cp env.example .env
-# Edit .env with your DATABASE_URL
-docker-compose up -d
+# Set DATABASE_URL and ideally AUTH_TOKEN
+docker compose up -d
 ```
 
-Server available at: `http://localhost:8888/mcp`
+The server listens on `http://localhost:8888/mcp`.
 
 ## Configuration
 
-Create `.env` file:
+All settings are read from environment variables (`.env` supported). Only `DATABASE_URL` is required.
 
-```env
-DATABASE_URL=postgresql://user:pass@host:5432/teslamate
-AUTH_TOKEN=                    # Optional: for remote auth
-```
+| Variable                | Default     | Notes                                                       |
+|-------------------------|-------------|-------------------------------------------------------------|
+| `DATABASE_URL`          | _required_  | `postgresql://user:pass@host:5432/teslamate`                |
+| `AUTH_TOKEN`            | _empty_     | Enables bearer auth on the HTTP endpoint                    |
+| `HOST`                  | `0.0.0.0`   | HTTP bind host                                              |
+| `PORT`                  | `8888`      | HTTP bind port                                              |
+| `POOL_MIN_SIZE`         | `1`         | psycopg pool floor                                          |
+| `POOL_MAX_SIZE`         | `10`        | psycopg pool ceiling                                        |
+| `QUERY_TIMEOUT_MS`      | `5000`      | `statement_timeout` for `run_sql`                           |
+| `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | LIMIT injected when `run_sql` doesn't supply one            |
+| `LOG_LEVEL`             | `INFO`      | Standard Python log level                                   |
+| `DEBUG`                 | `false`     | Starlette debug mode (keep off in production)               |
 
-**Generate auth token (optional):**
+Generate a bearer token:
 
 ```bash
-python utils/generate_token.py
+uv run teslamate-mcp gen-token
 ```
 
-## Available Tools
+## Available tools
 
-### Predefined Queries (18 tools)
+### Predefined (18)
 
-**Vehicle Info:**
+**Vehicle:** `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`
 
-- `get_basic_car_information` - VIN, model, firmware
-- `get_current_car_status` - Real-time status, location, battery
-- `get_software_update_history` - Firmware update timeline
+**Battery & health:** `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends`
 
-**Battery & Health:**
+**Driving:** `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`
 
-- `get_battery_health_summary` - Current health metrics
-- `get_battery_degradation_over_time` - Historical capacity
-- `get_daily_battery_usage_patterns` - Usage patterns
-- `get_tire_pressure_weekly_trends` - Tire pressure tracking
+**Efficiency:** `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_unusual_power_consumption`
 
-**Driving Analytics:**
+**Charging & location:** `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations`
 
-- `get_monthly_driving_summary` - Monthly statistics
-- `get_daily_driving_patterns` - Driving habits
-- `get_longest_drives_by_distance` - Top trips
-- `get_total_distance_and_efficiency` - Lifetime stats
-- `get_drive_summary_per_day` - Daily summaries
+### Custom (2)
 
-**Efficiency:**
+- `get_database_schema` — current TeslaMate schema (one row per column)
+- `run_sql(query)` — execute a custom `SELECT` or `WITH … SELECT`
 
-- `get_efficiency_by_month_and_temperature` - Seasonal analysis
-- `get_average_efficiency_by_temperature` - Temperature impact
-- `get_unusual_power_consumption` - Anomaly detection
+## Custom SQL safety model
 
-**Charging & Location:**
+`run_sql` does **not** rely on a regex blacklist alone. The actual guarantees come from the database:
 
-- `get_charging_by_location` - Charging patterns
-- `get_all_charging_sessions_summary` - Complete history
-- `get_most_visited_locations` - Frequent places
+1. **Regex pre-check** rejects multi-statement input and non-`SELECT`/`WITH` leading keywords (cheap fail-fast).
+2. **PostgreSQL `READ ONLY` transaction** with `SET LOCAL statement_timeout`, `lock_timeout`, and `idle_in_transaction_session_timeout`. The transaction is rolled back unconditionally.
+3. **Automatic LIMIT** — if you omit `LIMIT`, your query is wrapped in `SELECT * FROM (<your query>) AS _capped LIMIT 1000`.
+4. **Recommended**: connect with a dedicated read-only PostgreSQL role for defense in depth.
 
-### Custom Queries (2 tools)
-
-- `get_database_schema` - View database structure
-- `run_sql` - Execute custom SELECT queries (read-only, validated)
-
-## Example Queries
-
-```text
-"What's my current battery health?"
-"Show me my longest drives"
-"How does cold weather affect my efficiency?"
-"Where do I charge most often?"
-"Run a SQL query to find drives over 100km"
-```
-
-## Project Structure
+## Project layout
 
 ```text
 teslamate-mcp/
-├── src/              # Core modules
-│   ├── config.py     # Configuration
-│   ├── database.py    # DB operations
-│   ├── tools.py      # Tool registry
-│   └── validators.py # SQL validation
-├── queries/          # 18 SQL query files
-├── data/             # Database schema
-├── utils/            # Helper scripts
-├── main.py           # Local (STDIO)
-├── main_remote.py    # Remote (HTTP)
-├── Dockerfile
+├── src/teslamate_mcp/
+│   ├── cli.py            # click subcommands
+│   ├── server.py         # FastMCP factory + lifespan
+│   ├── config.py         # pydantic-settings
+│   ├── db.py             # async pool + read-only helper
+│   ├── auth.py           # bearer middleware
+│   ├── schema.py         # information_schema introspection
+│   ├── serialization.py  # Decimal/datetime → JSON
+│   ├── tools/
+│   │   ├── registry.py     # discover .sql + .toml pairs
+│   │   ├── custom_sql.py   # run_sql
+│   │   └── schema_tool.py  # get_database_schema
+│   └── queries/          # 18 .sql files, each with a sibling .toml
+├── tests/                # pytest, testcontainers-postgres
+├── Dockerfile            # multi-stage
 └── docker-compose.yml
 ```
 
+## Adding a new query
+
+1. Drop a SELECT into `src/teslamate_mcp/queries/your_query.sql`.
+2. Add a sibling `your_query.toml`:
+
+   ```toml
+   name = "get_your_data"
+   description = "What this returns."
+   ```
+
+3. Restart the server. The registry picks it up automatically.
+
 ## Development
 
-### Adding New Queries
-
-1. Create SQL file in `queries/`:
-
-```sql
--- queries/my_query.sql
-SELECT * FROM my_table;
-```
-
-2. Add to `src/tools.py`:
-
-```python
-ToolDefinition(
-    name="get_my_data",
-    description="What this returns",
-    sql_file="my_query.sql",
-)
-```
-
-3. Restart server - tool auto-registers!
-
-### Testing
-
 ```bash
-python test_server.py
+uv sync                          # install with dev deps
+uv run ruff check src tests      # lint
+uv run ruff format src tests     # format
+uv run pytest                    # tests (Docker-backed integration tests skip if Docker is absent)
 ```
-
-## Security
-
-- **Authentication**: Optional bearer token for remote access
-- **SQL Validation**: Only SELECT queries allowed
-- **Read-only**: No data modification possible
-- **Use HTTPS**: In production environments
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [TeslaMate](https://github.com/teslamate-org/teslamate) - Tesla data logging
-- [Model Context Protocol](https://modelcontextprotocol.io/) - AI integration protocol
+MIT — see [LICENSE](LICENSE).
