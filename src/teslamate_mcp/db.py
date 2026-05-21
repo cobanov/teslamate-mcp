@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
@@ -24,19 +25,19 @@ def build_pool(settings: Settings) -> AsyncConnectionPool:
 
 async def fetch_all(
     pool: AsyncConnectionPool,
-    sql: str,
+    query: str,
     params: tuple[Any, ...] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a trusted query and return JSON-safe rows. Used for predefined SQL files."""
     async with pool.connection() as conn, conn.cursor() as cur:
-        await cur.execute(sql, params)
+        await cur.execute(query, params)
         rows = await cur.fetchall()
     return rows_to_jsonable(rows)
 
 
 async def fetch_readonly(
     pool: AsyncConnectionPool,
-    sql: str,
+    query: str,
     statement_timeout_ms: int,
 ) -> list[dict[str, Any]]:
     """Run an untrusted query in a read-only transaction with hard timeouts.
@@ -46,20 +47,31 @@ async def fetch_readonly(
     local guards. The transaction is always rolled back, so even a query that
     bypasses Python-side checks cannot mutate the database.
     """
+    # SET LOCAL refuses parameter binding, so the timeout must be inlined as a
+    # literal. int() casts make any non-integer fail loudly before reaching PG.
+    stmt_ms = int(statement_timeout_ms)
+    lock_ms = 2000
+
     async with pool.connection() as conn:
         await conn.set_autocommit(False)
         async with conn.transaction(force_rollback=True):
             async with conn.cursor() as cur:
                 await cur.execute("SET TRANSACTION READ ONLY")
                 await cur.execute(
-                    "SET LOCAL statement_timeout = %s",
-                    (str(statement_timeout_ms),),
+                    sql.SQL("SET LOCAL statement_timeout = {ms}").format(
+                        ms=sql.Literal(stmt_ms)
+                    )
                 )
-                await cur.execute("SET LOCAL lock_timeout = %s", ("2000",))
                 await cur.execute(
-                    "SET LOCAL idle_in_transaction_session_timeout = %s",
-                    (str(statement_timeout_ms),),
+                    sql.SQL("SET LOCAL lock_timeout = {ms}").format(
+                        ms=sql.Literal(lock_ms)
+                    )
                 )
-                await cur.execute(sql)
+                await cur.execute(
+                    sql.SQL("SET LOCAL idle_in_transaction_session_timeout = {ms}").format(
+                        ms=sql.Literal(stmt_ms)
+                    )
+                )
+                await cur.execute(query)
                 rows = await cur.fetchall()
     return rows_to_jsonable(rows)

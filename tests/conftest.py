@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import sys
 from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
+
+# psycopg's async pool refuses to run on Windows' ProactorEventLoop. Forcing the
+# selector policy at import time keeps the integration tests working both on
+# Linux CI and on a developer's Windows box.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 try:  # pragma: no cover - import guarded so unit tests run without Docker
     from testcontainers.postgres import PostgresContainer
@@ -19,7 +27,8 @@ from teslamate_mcp.config import Settings
 
 
 _SETUP_SQL = """
-CREATE TABLE IF NOT EXISTS demo_cars (
+DROP TABLE IF EXISTS demo_cars;
+CREATE TABLE demo_cars (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     battery_kwh NUMERIC(6,2)
