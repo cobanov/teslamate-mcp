@@ -18,11 +18,13 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes
 
 ## Features
 
-- **20 tools** — 18 predefined analytics queries (battery, charging, driving, efficiency, locations) plus `run_sql` and `get_database_schema`
+- **25 tools** — 23 predefined analytics & search queries (battery, charging, driving, efficiency, locations, drive/charging search and detail) plus `run_sql` and `get_database_schema`
+- **Typed tool parameters** — every predefined tool accepts optional filters (`car_name`, `days` windows, `limit`, thresholds) declared in its `.toml` sidecar, validated at startup, and bound safely via psycopg named params; zero-argument calls return the full classic report
+- **Timezone-aware reports** — set `REPORT_TIMEZONE` (IANA name) so daily/weekly/monthly buckets follow your local midnight instead of UTC
 - **6 prompts** — one-click workflows for battery health, driving summary, charging behaviour, anomaly hunting, weather efficiency, and a quick status report
 - **2 resources** — `teslamate://queries` and `teslamate://queries/{name}` for catalog browsing without invoking a tool
 - **Hardened `run_sql`** — runs inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and an automatic row cap
-- **Live schema introspection** — `get_database_schema` reads `information_schema` at runtime; no stale JSON checked into the repo
+- **Live schema introspection** — `get_database_schema` lists all tables compactly, or full column detail for one `table`; no stale JSON checked into the repo
 - **Two transports, one binary** — `teslamate-mcp stdio` for local clients, `teslamate-mcp http` for remote
 - **Bearer-token auth** with timing-safe comparison; `/health` probe for liveness checks
 - **`Decimal → float` JSON serialization** so language models see numbers, not strings
@@ -100,6 +102,7 @@ All settings are read from environment variables (`.env` supported). Only `DATAB
 | `POOL_MAX_SIZE`         | `10`        | psycopg pool ceiling                                        |
 | `QUERY_TIMEOUT_MS`      | `5000`      | `statement_timeout` for `run_sql`                           |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | LIMIT injected when `run_sql` doesn't supply one            |
+| `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for daily/weekly/monthly report buckets       |
 | `LOG_LEVEL`             | `INFO`      | Standard Python log level                                   |
 | `DEBUG`                 | `false`     | Starlette debug mode (keep off in production)               |
 
@@ -111,7 +114,11 @@ uv run teslamate-mcp gen-token
 
 ## Available tools
 
-### Predefined (18)
+Every predefined tool accepts **optional filters** — `car_name` (substring match) everywhere,
+plus `days` windows, `limit` caps, and per-tool thresholds where they make sense. Calling a
+tool with no arguments returns the full classic report.
+
+### Predefined reports (18)
 
 **Vehicle:** `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`
 
@@ -123,9 +130,17 @@ uv run teslamate-mcp gen-token
 
 **Charging & location:** `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations`
 
+### Search & analytics (5)
+
+- `search_drives` — filter drives by date range, location text, distance bounds, car; sortable
+- `search_charging_sessions` — filter charging sessions by date range, location, energy, car
+- `get_drive_details(drive_id)` — full stats for one drive found via search
+- `get_charging_curve(charging_process_id)` — downsampled power/SOC curve for one session
+- `get_charging_costs` — cost breakdown grouped by month, location, or car
+
 ### Custom (2)
 
-- `get_database_schema` — current TeslaMate schema (one row per column)
+- `get_database_schema([table])` — compact table list, or full column detail for one table
 - `run_sql(query)` — execute a custom `SELECT` or `WITH … SELECT`
 
 ## Adding a new query
@@ -135,10 +150,29 @@ uv run teslamate-mcp gen-token
 
    ```toml
    name = "get_your_data"
-   description = "What this returns."
+   description = "What this returns, units, grouping, and available filters."
+
+   [[params]]                 # optional — declare typed tool arguments
+   name = "car_name"
+   type = "string"            # string | integer | number | boolean
+   description = "Case-insensitive substring match on the car's name."
+
+   [[params]]
+   name = "limit"
+   type = "integer"
+   description = "Maximum number of rows returned."
+   default = 10
+   minimum = 1
+   maximum = 100
    ```
 
-3. Restart the server. The registry picks it up automatically.
+3. Reference params in the SQL as `%(car_name)s` placeholders — **never** string-interpolate.
+   Rules enforced at startup: every declared param must appear in the SQL (and vice versa);
+   cast the first occurrence (`%(car_name)s::text`, `%(limit)s::int`) so NULL binding works;
+   escape literal `%` as `%%` in parameterized queries. The reserved `%(tz)s` placeholder binds
+   `REPORT_TIMEZONE` automatically for `AT TIME ZONE` bucketing.
+4. Restart the server. The registry validates and picks it up automatically
+   (`teslamate-mcp list-tools` to confirm).
 
 ## Development
 

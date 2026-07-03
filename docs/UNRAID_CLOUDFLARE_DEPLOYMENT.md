@@ -191,7 +191,9 @@ curl -s -X POST https://teslamate-mcp.your-domain.com/mcp \
 
 teslamate-mcp does not implement OAuth/dynamic client registration, so **Custom Headers**
 is the correct (and documented) auth method for it. Save — Cloudflare connects, syncs
-capabilities, and the server status becomes **Ready** (20 tools, 6 prompts, 2 resources).
+capabilities, and the server status becomes **Ready** (25 tools as of 0.4.0, 6 prompts, 2 resources).
+After deploying a new server version with added/changed tools, force **⋯ → Sync capabilities**
+on the MCP server entry (auto-resync is ~2h).
 
 ### 3.2 Create the portal
 
@@ -272,7 +274,7 @@ web connector does not. If you hit this:
 - [ ] `curl https://teslamate-mcp.your-domain.com/health` → 200 (tunnel)
 - [ ] `curl https://teslamate-mcp.your-domain.com/mcp` without token → **401**
 - [ ] MCP initialize with bearer token → success (Phase 2.4)
-- [ ] Portal dashboard: server **Ready**, 20 tools synced
+- [ ] Portal dashboard: server **Ready**, 25 tools synced (0.4.0+)
 - [ ] Client connected via portal URL; `get_basic_car_information` returns your car
 - [ ] Negative: `run_sql` with `DELETE FROM cars` → rejected (validator + READ ONLY txn)
 

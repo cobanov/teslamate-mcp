@@ -10,8 +10,8 @@ total_tokens: 19934
 
 **teslamate-mcp** is a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes a
 [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to AI assistants (Claude Desktop,
-Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **20 tools** (18 fixed analytics queries +
-`run_sql` + `get_database_schema`), **6 prompts**, and **2 resources**. Python 3.11+, built on the official
+Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search queries with
+typed optional parameters + `run_sql` + `get_database_schema`), **6 prompts**, and **2 resources**. Python 3.11+, built on the official
 `mcp[cli]` SDK (FastMCP) and `psycopg` 3 async pool.
 
 ---
@@ -38,7 +38,7 @@ graph TB
     end
 
     subgraph Surfaces["Registered MCP surfaces"]
-        Pre["18 predefined tools<br/>(tools/registry.py)"]
+        Pre["23 predefined tools<br/>(tools/registry.py)"]
         RunSQL["run_sql<br/>(tools/custom_sql.py)"]
         SchemaTool["get_database_schema<br/>(tools/schema_tool.py)"]
         Res["2 resources (resources.py)"]
@@ -53,7 +53,7 @@ graph TB
     end
 
     DB[("TeslaMate<br/>PostgreSQL")]
-    Queries["queries/*.sql + *.toml<br/>(18 bundled pairs)"]
+    Queries["queries/*.sql + *.toml<br/>(23 bundled pairs)"]
 
     IDE --> CLI
     Remote --> Auth --> FastMCP
@@ -100,7 +100,7 @@ teslamate-mcp/
 │   │   ├── registry.py      # .sql+.toml -> MCP tool discovery & registration
 │   │   ├── custom_sql.py    # run_sql tool: validate_sql + enforce_limit
 │   │   └── schema_tool.py   # get_database_schema tool
-│   └── queries/             # 18 × (<name>.sql + <name>.toml) bundled report pairs
+│   └── queries/             # 23 × (<name>.sql + <name>.toml) bundled report pairs
 ├── tests/                   # pytest + pytest-asyncio + testcontainers[postgres]
 ├── pyproject.toml           # hatchling build, deps, ruff/pytest config, console script
 ├── Dockerfile               # multi-stage (uv builder -> slim runtime, non-root, /health)
@@ -153,6 +153,7 @@ every handler via `ctx.request_context.lifespan_context`.
 | `pool_min_size` / `pool_max_size` | `POOL_MIN_SIZE` / `POOL_MAX_SIZE` | `1` / `10` | |
 | `query_timeout_ms` | `QUERY_TIMEOUT_MS` | `5000` | `statement_timeout` for `run_sql` only |
 | `custom_sql_row_limit` | `CUSTOM_SQL_ROW_LIMIT` | `1000` | auto-`LIMIT` for `run_sql` |
+| `report_timezone` | `REPORT_TIMEZONE` | `UTC` | IANA name; binds to the reserved `%(tz)s` placeholder |
 | `log_level` | `LOG_LEVEL` | `INFO` | |
 | `debug` | `DEBUG` | `False` | Starlette debug |
 
@@ -187,7 +188,13 @@ Turns declarative **`<name>.sql` + `<name>.toml`** file pairs into MCP tools:
    (avoids the late-binding closure bug), pulls the pool from lifespan context, logs via `ctx.info()`, calls
    `fetch_all(pool, tool.sql)`. All share `ToolAnnotations(readOnlyHint=True, idempotentHint=True, ...)`.
 
-**Gotcha**: predefined tools take **no parameters** — every query is a fixed, whole-database report (no per-car or
+Params: the `.toml` contract supports `[[params]]` tables (name/type/description/required/default/min/max/enum),
+validated at discovery with SQL-placeholder cross-checks and a stray-`%` lint. `_build_signature()` crafts a real
+`inspect.Signature` (ctx first, `Annotated[T, Field(...)]` annotations, defaults on the Parameter) and sets it as
+`handler.__signature__` — the single source of truth FastMCP introspects for the input schema. Values bind via
+psycopg `%(name)s` placeholders (dict params); the reserved `%(tz)s` placeholder auto-injects `REPORT_TIMEZONE`.
+
+**Historical gotcha (fixed in 0.4.0)**: predefined tools took no parameters (no per-car or
 per-date filtering). `handler.__annotations__["ctx"] = Context` is patched manually — see the 0.3.1 bugfix below.
 
 ### Custom SQL — `tools/custom_sql.py` (`run_sql`)
@@ -227,10 +234,11 @@ reference (no cross-check).
 
 ---
 
-## The Query Catalog (18 predefined tools)
+## The Query Catalog (23 predefined tools)
 
-Each is a fixed, **parameter-less**, all-cars report. `.toml` contract is minimal — only `name` + `description`
-(flat TOML, no tags/params). Tool name is taken from the `.toml`, not the filename.
+Since 0.4.0 every tool accepts **typed optional params** — `car_name` everywhere, plus `days`/`limit`/thresholds
+where applicable (zero-arg calls preserve the classic full report). The `.toml` contract is `name` + `description`
++ optional `[[params]]` tables. Tool name is taken from the `.toml`, not the filename.
 
 | Tool (`name` in .toml) | Purpose | TeslaMate tables |
 |------------------------|---------|------------------|
@@ -253,7 +261,13 @@ Each is a fixed, **parameter-less**, all-cars report. `.toml` contract is minima
 | `get_all_charging_sessions_summary` | Per-car charging totals + cost | `charging_processes`, `cars` |
 | `get_most_visited_locations` | Top-15 addresses by visit count (**all cars combined**) | `drives`, `addresses` |
 
-**Plus 2 built-ins**: `get_database_schema` and `run_sql(query)` = **20 tools total**.
+| `search_drives` | Drive search: date range, location text, distance bounds, sort | `drives`, `cars`, `addresses` |
+| `search_charging_sessions` | Charging-session search: date range, location, min energy | `charging_processes`, `cars`, `addresses` |
+| `get_drive_details` | Full stats for one drive (**drive_id required**) | `drives`, `cars`, `addresses` |
+| `get_charging_curve` | NTILE-downsampled power/SOC curve for one session (**charging_process_id required**) | `charges` |
+| `get_charging_costs` | Cost totals grouped by month/location/car | `charging_processes`, `cars`, `addresses` |
+
+**Plus 2 built-ins**: `get_database_schema(table=None)` and `run_sql(query)` = **25 tools total**.
 
 ### Inferred TeslaMate schema
 
@@ -264,8 +278,8 @@ dimension. `car_settings` joins 1:1 via `cars.settings_id`.
 
 ### SQL conventions & gotchas
 - **Metric-only** (`_km`, °C) — no mile/°F conversion; consumers infer units from column names.
-- **Timezone-naive** — rolling windows use `CURRENT_DATE - INTERVAL 'N…'` against server TZ; day buckets may not
-  match the driver's local midnight (TeslaMate stores UTC).
+- **Timezones**: day/week/month buckets follow `REPORT_TIMEZONE` (via `AT TIME ZONE %(tz)s`); rolling `days`
+  windows stay `CURRENT_DATE`-based (sargable, deliberately tz-approximate).
 - **3 queries drop the per-car join** (`drive_summary_per_day`, `charging_by_location`, `most_visited_locations`)
   → fleet totals, though their `.toml` descriptions say "each car" (boilerplate mismatch).
 - "Battery health %" and ">150% consumption" are **rated-range heuristics**, not calibrated energy/capacity metrics.
@@ -330,7 +344,9 @@ Runtime deps: `mcp[cli]`, `psycopg[binary]`, `psycopg-pool`, `pydantic`, `pydant
 (`test_db.py`, `test_schema.py`) **skip** when Docker is absent. Pure unit tests cover `serialization`,
 `custom_sql` validators, and registry discovery. `test_registry.py` includes a regression test that `ctx` never
 leaks into any tool's `inputSchema` (the 0.3.1 fix). **Untested**: `auth.py`, `cli.py`, `prompts.py`,
-`resources.py`, and the 18 bundled queries against real data.
+`resources.py`. Since 0.4.0, `tests/test_tools_e2e.py` runs **every** bundled query against a seeded
+TeslaMate-shaped Postgres, plus param binding, timezone bucketing, and schema-tool tests;
+`tests/test_registry_params.py` covers the TOML contract validation.
 
 **Docker**: multi-stage — `uv sync --frozen --no-dev` in a builder, copied into a slim non-root (`mcp`, uid 1000)
 runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` runs `http --json-response`.
@@ -357,7 +373,9 @@ runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` r
 ## Gotchas (top of mind)
 
 1. **HTTP is unauthenticated unless `AUTH_TOKEN` is set** — only a warning, not a hard stop.
-2. **Predefined tools take no parameters** — whole-DB reports; scope by post-filtering or `run_sql`.
+2. **Param SQL rules** — cast the first occurrence of every `%(param)s` (`::text`/`::int`/`::float8`), escape
+   literal `%` as `%%` in parameterized queries, and repeat bucketing expressions identically in GROUP BY.
+   Discovery lints these at startup.
 3. **`fetch_all` has no read-only/timeout guard** — safe only because its SQL is curated. New predefined queries
    must be manually verified non-mutating.
 4. **Schema cache never invalidates** on a live server — DDL changes need a restart.

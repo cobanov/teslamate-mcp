@@ -4,6 +4,44 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-04
+
+### Added
+- **Typed tool parameters**: the `.toml` sidecar contract now supports `[[params]]` tables
+  (name, type, description, required, default, minimum/maximum, enum). Declared params are
+  validated at startup, surfaced in each tool's MCP input schema with types/defaults/constraints,
+  and bound to `%(name)s` placeholders via psycopg — never interpolated into SQL text.
+- All 18 predefined queries now accept optional filters (`car_name` everywhere; `days` windows;
+  `limit`, and per-tool thresholds like `min_swing_pct`/`threshold_pct`). Zero-argument calls
+  return exactly what they returned before — defaults mirror the old hardcoded values.
+- **Five new tools**: `search_drives` (date range, location text, distance bounds, sort),
+  `search_charging_sessions`, `get_drive_details(drive_id)`, `get_charging_curve
+  (charging_process_id)` (NTILE-downsampled curve from the `charges` table), and
+  `get_charging_costs` (group by month/location/car).
+- `REPORT_TIMEZONE` setting (IANA name, default `UTC`): daily/weekly/monthly buckets in the
+  reporting queries are computed in this timezone via `AT TIME ZONE` binding.
+- `get_database_schema` now takes an optional `table` argument: omit it for a compact
+  table list with column counts, pass a table name for full column detail.
+- Discovery-time SQL lint: undeclared/unused placeholders and unescaped literal `%` in
+  parameterized queries fail fast at startup.
+- Test suite: TOML contract validation tests, generated-schema assertions, and an end-to-end
+  suite that runs every bundled tool against a seeded TeslaMate-shaped Postgres (testcontainers),
+  including timezone bucketing and param binding.
+
+### Changed
+- All tool descriptions rewritten to be accurate and information-dense (units, grouping,
+  default windows, available filters). Three descriptions that claimed per-car grouping for
+  fleet-wide aggregates (`get_drive_summary_per_day`, `get_charging_by_location`,
+  `get_most_visited_locations`) are corrected.
+- `fetch_all` accepts dict params for named-placeholder binding.
+- `list-tools` prints each tool's parameter names.
+- The `teslamate://queries` resource index includes each query's param names.
+
+### Fixed
+- `get_battery_health_summary` failed at runtime with `function round(double precision, integer)
+  does not exist` — the health percentage expression lacked a `::numeric` cast. Caught by the
+  new run-every-tool e2e test.
+
 ## [0.3.1] - 2026-05-21
 
 ### Fixed
