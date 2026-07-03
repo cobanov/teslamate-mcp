@@ -26,9 +26,13 @@ def build_pool(settings: Settings) -> AsyncConnectionPool:
 async def fetch_all(
     pool: AsyncConnectionPool,
     query: str,
-    params: tuple[Any, ...] | None = None,
+    params: tuple[Any, ...] | dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run a trusted query and return JSON-safe rows. Used for predefined SQL files."""
+    """Run a trusted query and return JSON-safe rows. Used for predefined SQL files.
+
+    Dict params bind to `%(name)s` placeholders. When params is not None, literal
+    percent signs in the SQL must be escaped as `%%`.
+    """
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(query, params)
         rows = await cur.fetchall()

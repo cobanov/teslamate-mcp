@@ -63,7 +63,7 @@ def create_server(settings: Settings) -> FastMCP:
     )
 
     tools = discover_predefined_tools()
-    register_predefined_tools(mcp, tools)
+    register_predefined_tools(mcp, tools, report_timezone=settings.report_timezone)
     register_schema_tool(mcp)
     register_custom_sql(
         mcp,
