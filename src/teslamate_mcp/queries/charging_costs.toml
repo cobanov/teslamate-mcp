@@ -1,0 +1,24 @@
+name = "get_charging_costs"
+description = "Charging cost analysis grouped by local month, charging location, or car: session count, total energy kWh, total cost (in the currency configured in TeslaMate), and average cost per kWh. Optional filters: car_name and a local-calendar date range."
+
+[[params]]
+name = "group_by"
+type = "string"
+description = "Grouping dimension for the cost breakdown."
+default = "month"
+enum = ["month", "location", "car"]
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "start_date"
+type = "string"
+description = "Earliest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "end_date"
+type = "string"
+description = "Latest local calendar date to include, ISO format (YYYY-MM-DD)."

@@ -19,6 +19,8 @@ WHERE d.distance > 0
     AND d.start_rated_range_km > d.end_rated_range_km
     AND (
         (d.start_rated_range_km - d.end_rated_range_km) / d.distance * 100
-    ) > 150 -- More than 150% consumption
+    ) > %(threshold_pct)s::float8 -- consumption above threshold_pct
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+    AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
 ORDER BY consumption_pct DESC
-LIMIT 10;
+LIMIT %(limit)s::int;

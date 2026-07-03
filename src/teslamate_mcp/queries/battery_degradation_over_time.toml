@@ -1,2 +1,15 @@
 name = "get_battery_degradation_over_time"
-description = "Get the battery degradation over time for each car. Tracks battery health metrics and capacity changes."
+description = "Per-car battery degradation: monthly average and maximum rated range (km) from positions logged at 100% battery, with data-point counts, over the last 730 days by default (months bucketed in the report timezone). Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Window in days. The default preserves the tool's original window."
+default = 730
+minimum = 28
+maximum = 3650

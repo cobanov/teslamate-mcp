@@ -1,2 +1,7 @@
 name = "get_current_car_status"
-description = "Get the current car status for each car. Returns real-time vehicle status including location, battery level, and state."
+description = "Returns the latest recorded snapshot per car: battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."

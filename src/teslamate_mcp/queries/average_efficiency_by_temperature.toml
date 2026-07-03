@@ -1,2 +1,13 @@
 name = "get_average_efficiency_by_temperature"
-description = "Get the average efficiency by temperature for each car. Helps understand how temperature affects vehicle efficiency."
+description = "Per-car driving efficiency bucketed by outside temperature range (°C): trip count, average distance (km), and average rated range consumed as a percentage of distance driven. Covers all time by default. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1

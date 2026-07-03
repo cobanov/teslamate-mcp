@@ -1,2 +1,19 @@
 name = "get_charging_by_location"
-description = "Get the charging by location for each car. Shows charging patterns and statistics grouped by location."
+description = "Charging statistics by location for the whole fleet: session count, total and average energy added (kWh), total charging time (minutes), and total cost, ordered by most sessions. Returns all locations over all time by default. Optional filters: car_name, days, limit."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+minimum = 1

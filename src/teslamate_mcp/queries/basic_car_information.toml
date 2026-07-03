@@ -1,2 +1,7 @@
 name = "get_basic_car_information"
-description = "Get the basic car information for each car. Returns VIN, model, firmware version, and other vehicle details."
+description = "Basic information for each car: name, model, trim badging, exterior color, marketing name, and whether logging and free supercharging are enabled. Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."

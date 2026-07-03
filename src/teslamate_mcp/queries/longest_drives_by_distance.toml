@@ -1,2 +1,27 @@
 name = "get_longest_drives_by_distance"
-description = "Get the longest drives by distance for each car. Lists the longest trips taken with details about distance and duration."
+description = "Returns the longest drives by distance across all cars (top 10 by default): start time, distance (km), duration (minutes), max speed, start/end addresses, and average outside temperature (°C). Optional filters: car_name, days, min_distance_km, limit."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only include drives of at least this distance in km. Omit for no minimum."
+minimum = 0
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 10
+minimum = 1
+maximum = 100

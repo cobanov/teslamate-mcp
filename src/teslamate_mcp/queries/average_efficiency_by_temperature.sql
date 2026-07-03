@@ -16,6 +16,8 @@ FROM drives d
 WHERE d.distance > 0
     AND d.start_rated_range_km > d.end_rated_range_km
     AND d.outside_temp_avg IS NOT NULL
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+    AND (%(days)s::int IS NULL OR d.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
 GROUP BY c.name,
     CASE
         WHEN d.outside_temp_avg < 0 THEN 'Below 0°C'

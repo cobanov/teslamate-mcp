@@ -1,5 +1,5 @@
 SELECT c.name as car_name,
-    DATE_TRUNC('week', p.date) as week,
+    DATE_TRUNC('week', (p.date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text) as week,
     AVG(p.tpms_pressure_fl) as avg_front_left,
     AVG(p.tpms_pressure_fr) as avg_front_right,
     AVG(p.tpms_pressure_rl) as avg_rear_left,
@@ -16,9 +16,10 @@ WHERE p.tpms_pressure_fl IS NOT NULL
     AND p.tpms_pressure_fr IS NOT NULL
     AND p.tpms_pressure_rl IS NOT NULL
     AND p.tpms_pressure_rr IS NOT NULL
-    AND p.date >= CURRENT_DATE - INTERVAL '90 days'
+    AND p.date >= CURRENT_DATE - make_interval(days => %(days)s::int)
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
 GROUP BY c.id,
     c.name,
-    DATE_TRUNC('week', p.date)
+    DATE_TRUNC('week', (p.date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text)
 ORDER BY week DESC,
     c.name;

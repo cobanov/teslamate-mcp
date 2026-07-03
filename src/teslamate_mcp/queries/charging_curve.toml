@@ -1,0 +1,16 @@
+name = "get_charging_curve"
+description = "Time-bucketed charging curve for one charging session by charging_process_id (find ids with search_charging_sessions): per bucket the start time, battery level start/end %, average/max charger power kW, voltage, current A, rated range km, and outside temperature °C. Long sessions are downsampled to at most max_points buckets."
+
+[[params]]
+name = "charging_process_id"
+type = "integer"
+description = "The charging session's id, as returned by search_charging_sessions."
+required = true
+
+[[params]]
+name = "max_points"
+type = "integer"
+description = "Maximum number of curve buckets returned; long sessions are averaged into this many buckets."
+default = 120
+minimum = 10
+maximum = 1000

@@ -1,2 +1,21 @@
 name = "get_most_visited_locations"
-description = "Get the most visited locations for each car. Shows frequently visited places with visit counts and durations."
+description = "Most visited locations across the whole fleet: address, city, state, visit count (drives starting or ending there), and total time spent (minutes). Returns the top 15 locations by default. Optional filters: car_name, days, limit."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 15
+minimum = 1
+maximum = 100

@@ -1,0 +1,49 @@
+name = "search_drives"
+description = "Search individual drives (trips) with flexible filters: date range (local calendar dates), car, distance bounds (km), and free-text location match against start/end address or city. Returns drive_id (usable with get_drive_details), timestamps, distance km, duration, max speed, locations, and rated range used. Newest first by default; 50 rows max by default."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "start_date"
+type = "string"
+description = "Earliest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "end_date"
+type = "string"
+description = "Latest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only drives at least this many kilometers long."
+minimum = 0
+
+[[params]]
+name = "max_distance_km"
+type = "number"
+description = "Only drives at most this many kilometers long."
+minimum = 0
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against start/end address names and cities."
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 50
+minimum = 1
+maximum = 500
+
+[[params]]
+name = "order_by"
+type = "string"
+description = "Sort order: newest first (start_date), longest first (distance), or slowest first (duration)."
+default = "start_date"
+enum = ["start_date", "distance", "duration"]

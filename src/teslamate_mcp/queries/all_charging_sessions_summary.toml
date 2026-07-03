@@ -1,2 +1,13 @@
 name = "get_all_charging_sessions_summary"
-description = "Get the summary of all charging sessions for each car. Returns charging statistics including total sessions, energy consumed, and costs."
+description = "Per-car charging summary: total sessions, total and average energy added (kWh), total and average charging time (minutes), and total cost. Covers all time by default. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1

@@ -1,2 +1,22 @@
 name = "get_daily_battery_usage_patterns"
-description = "Get the daily battery usage patterns for each car. Analyzes battery consumption patterns throughout the day."
+description = "Returns per-car daily battery usage over the last 30 days by default: min and max battery level (%) and the daily swing (max minus min, percentage points) per local calendar day, keeping only days where the swing exceeds min_swing_pct (default 5). Optional filters: car_name, days, min_swing_pct."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Window in days. The default preserves the tool's original window."
+default = 30
+minimum = 1
+
+[[params]]
+name = "min_swing_pct"
+type = "integer"
+description = "Only include days whose battery swing (max minus min, percentage points) exceeds this value."
+default = 5
+minimum = 0
+maximum = 100

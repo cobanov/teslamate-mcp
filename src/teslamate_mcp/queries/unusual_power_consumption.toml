@@ -1,2 +1,29 @@
 name = "get_unusual_power_consumption"
-description = "Get the unusual power consumption for each car. Identifies anomalies in power usage that might indicate issues."
+description = "Lists individual drives whose rated-range consumption exceeds threshold_pct (range used as a percent of distance driven, default 150), with car name, date, distance (km), range used (km), consumption percentage, outside temperature (°C), and start/end locations. Returns the top 10 by consumption by default. Optional filters: car_name, days, threshold_pct, limit."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "threshold_pct"
+type = "number"
+description = "Flag drives whose range consumption exceeds this percent of distance driven. The default preserves the tool's original threshold."
+default = 150
+minimum = 100
+maximum = 1000
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 10
+minimum = 1
+maximum = 100
