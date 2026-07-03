@@ -108,9 +108,10 @@ def list_tools_cmd() -> None:
     """Print the names of all registered tools without starting the server."""
     tools = discover_predefined_tools()
     for tool in tools:
-        click.echo(f"{tool.name:<45} {tool.source}")
-    click.echo(f"{'get_database_schema':<45} (built-in)")
-    click.echo(f"{'run_sql':<45} (built-in)")
+        params = ", ".join(p.name for p in tool.params) or "no params"
+        click.echo(f"{tool.name:<45} {tool.source}  ({params})")
+    click.echo(f"{'get_database_schema':<45} (built-in)  (table)")
+    click.echo(f"{'run_sql':<45} (built-in)  (query)")
 
 
 if __name__ == "__main__":  # pragma: no cover
