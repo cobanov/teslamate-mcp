@@ -195,7 +195,9 @@ validated at discovery with SQL-placeholder cross-checks and a stray-`%` lint. `
 psycopg `%(name)s` placeholders (dict params); the reserved `%(tz)s` placeholder auto-injects `REPORT_TIMEZONE`.
 
 **Historical gotcha (fixed in 0.4.0)**: predefined tools took no parameters (no per-car or
-per-date filtering). `handler.__annotations__["ctx"] = Context` is patched manually — see the 0.3.1 bugfix below.
+per-date filtering), and `handler.__annotations__["ctx"]` was patched manually (the 0.3.1 ctx-leak fix) —
+superseded by the crafted `__signature__`, which handles ctx exclusion and param exposure in one mechanism.
+(`schema_tool.py` still uses the annotations patch for its plain-function handler.)
 
 ### Custom SQL — `tools/custom_sql.py` (`run_sql`)
 
@@ -334,8 +336,10 @@ token is present.
 
 ## Build, Test & CI
 
-**Packaging** (`pyproject.toml`): `teslamate-mcp` v0.3.1, Python ≥3.11, **hatchling** build (src-layout;
-`force-include` bundles `queries/` into the wheel). Console script `teslamate-mcp = "teslamate_mcp.cli:main"`.
+**Packaging** (`pyproject.toml`): `teslamate-mcp` v0.4.0, Python ≥3.11, **hatchling** build (src-layout;
+the `packages` include ships `queries/` — do NOT re-add a `force-include` for it: hatchling ≥1.19 rejects the
+duplicate at wheel-build time, which only surfaces in non-editable builds like Docker). Console script
+`teslamate-mcp = "teslamate_mcp.cli:main"`.
 Runtime deps: `mcp[cli]`, `psycopg[binary]`, `psycopg-pool`, `pydantic`, `pydantic-settings`, `click`, `uvicorn`,
 `starlette`. Dev: `ruff`, `pytest`, `pytest-asyncio`, `testcontainers[postgres]`. Ruff line-length 100.
 
@@ -343,10 +347,11 @@ Runtime deps: `mcp[cli]`, `psycopg[binary]`, `psycopg-pool`, `pydantic`, `pydant
 `postgres:16-alpine` (a session-scoped `conftest.py` seeds a `demo_cars` table). Docker-backed integration tests
 (`test_db.py`, `test_schema.py`) **skip** when Docker is absent. Pure unit tests cover `serialization`,
 `custom_sql` validators, and registry discovery. `test_registry.py` includes a regression test that `ctx` never
-leaks into any tool's `inputSchema` (the 0.3.1 fix). **Untested**: `auth.py`, `cli.py`, `prompts.py`,
-`resources.py`. Since 0.4.0, `tests/test_tools_e2e.py` runs **every** bundled query against a seeded
-TeslaMate-shaped Postgres, plus param binding, timezone bucketing, and schema-tool tests;
-`tests/test_registry_params.py` covers the TOML contract validation.
+leaks into any tool's `inputSchema` (the 0.3.1 fix) plus generated-schema assertions; `test_cli.py` covers the
+CLI incl. the `--json-response` regression; `tests/test_registry_params.py` covers the TOML `[[params]]`
+contract; `tests/test_tools_e2e.py` runs **every** bundled query against a seeded TeslaMate-shaped Postgres
+(param binding, timezone bucketing, schema tool). 75 tests total. **Still untested**: `auth.py`, `prompts.py`,
+`resources.py`.
 
 **Docker**: multi-stage — `uv sync --frozen --no-dev` in a builder, copied into a slim non-root (`mcp`, uid 1000)
 runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` runs `http --json-response`.

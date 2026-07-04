@@ -84,25 +84,27 @@ Option B — manual (**Docker → Add Container**):
 | Field | Value |
 |---|---|
 | Name | `teslamate-mcp` |
-| Repository | `ghcr.io/cobanov/teslamate-mcp:latest` |
+| Repository | `ghcr.io/batubozkan/teslamate-mcp:latest` (this repo's release image, v0.4.0+) |
 | Network type | `bridge` |
 | Port | host `8888` → container `8888` (TCP) |
 | Env `DATABASE_URL` | `postgresql://teslamate_ro:<pw>@192.168.1.100:5432/teslamate` (or the main `teslamate` user) |
 | Env `AUTH_TOKEN` | `<AUTH_TOKEN>` from step 1.1 |
+| Env `REPORT_TIMEZONE` | `Europe/Istanbul` (IANA name; daily/monthly buckets follow local midnight) |
 | Env `LOG_LEVEL` | `INFO` |
+
+> **Private image:** `ghcr.io/batubozkan/teslamate-mcp` is a private GHCR package. Before the
+> first pull, run `docker login ghcr.io -u batubozkan` on the Unraid terminal with a GitHub
+> PAT (classic, `read:packages` scope) — or make the package public in its GitHub settings.
+> Releases are published by pushing a `v*` tag (`git tag v0.x.y && git push origin v0.x.y`).
 
 > The image's default command already runs the HTTP transport
 > (`teslamate-mcp http --host 0.0.0.0 --port 8888 --json-response`), runs as a non-root
-> user, and has a built-in Docker `HEALTHCHECK` on `/health`.
+> user, and has a built-in Docker `HEALTHCHECK` on `/health`. Leave **Post Arguments** empty.
 
-> **⚠️ Known bug in the published `0.3.1` image:** the default command's `--json-response`
-> flag crashes at startup (`ValueError: "Settings" object has no field
-> "streamable_http_json_response"`). Workaround: override the command — in the Unraid
-> container config (Advanced view) set **Post Arguments** to
-> `teslamate-mcp http --host 0.0.0.0 --port 8888` (drops `--json-response`; SSE-response
-> mode is standard streamable HTTP and works with the Cloudflare portal and all clients).
-> Fixed in `src/teslamate_mcp/cli.py` (set `mcp.settings.json_response` *before*
-> `streamable_http_app()`); remove the workaround once an image containing the fix is used.
+> **Historical (only if running the upstream `cobanov/…:0.3.1` image):** that image's
+> `--json-response` flag crashes at startup. Workaround: set **Post Arguments** to
+> `teslamate-mcp http --host 0.0.0.0 --port 8888`. Fixed in 0.4.0 — the workaround must be
+> removed when upgrading, or you'll silently keep SSE-response mode.
 
 > **Postgres reachability:** `192.168.1.100:5432` works when the TeslaMate PostgreSQL
 > container publishes port 5432 (the standard Unraid TeslaMate setup does). If it doesn't,
@@ -113,7 +115,7 @@ Option B — manual (**Docker → Add Container**):
 
 ```bash
 curl http://192.168.1.100:8888/health
-# → {"status":"ok","version":"0.3.1"}
+# → {"status":"ok","version":"0.4.0"}
 
 curl -i http://192.168.1.100:8888/mcp
 # → HTTP 401 (bearer auth active)
@@ -209,6 +211,22 @@ on the MCP server entry (auto-resync is ~2h).
 Then edit the portal → **Advanced settings → enable Managed OAuth** (this is what lets MCP
 clients like claude.ai authenticate without a browser-cookie flow).
 
+### 3.3 Allowlist client OAuth callbacks (REQUIRED for Claude clients)
+
+Without this, Claude fails at Dynamic Client Registration with *"Couldn't register with …'s
+sign-in service"* — Access rejects the client's `redirect_uri`
+(`invalid_client_metadata: redirect_uri is not allowed by the account configuration`).
+
+**Zero Trust → Access controls → Applications** → the portal's auto-created application →
+**Edit → Advanced settings** → Managed OAuth:
+
+| Setting | Value |
+|---|---|
+| Allowed redirect URIs | `https://claude.ai/api/mcp/auth_callback` |
+| *(second entry)* | `https://claude.com/api/mcp/auth_callback` |
+| Allow localhost clients | On (CLI clients like Claude Code) |
+| Allow loopback clients | On |
+
 Optional: under the portal's server settings you can disable individual tools (e.g. hide
 `run_sql` if you only want the predefined analytics).
 
@@ -250,21 +268,21 @@ claude mcp add --transport http teslamate https://mcp.your-domain.com/mcp
 }
 ```
 
-### Known issue + fallbacks (claude.ai web/mobile)
+### OAuth failure modes (claude.ai / Claude Desktop)
 
-As of mid-2026 there are field reports of claude.ai web/mobile failing the OAuth handshake
-against Access Managed OAuth portals (*"Authorization with the MCP server failed"*, before
-any login screen) while **Claude Code succeeds against the identical URL** — root cause is a
-missing `WWW-Authenticate: … resource_metadata=…` header on the portal's 401 response,
-which Claude Code tolerates by probing `/.well-known/oauth-protected-resource` and the
-web connector does not. If you hit this:
+Two distinct failures, in the order you're likely to meet them:
 
-1. Use **Claude Desktop with `mcp-remote`** (config above in `claude_desktop_config.json`) —
-   the wrapper performs the OAuth flow itself and is not affected.
-2. Re-test the claude.ai connector periodically — a fix can land on either Cloudflare's or
-   Anthropic's side without action from you.
-3. Last resort for web/mobile: front the tunnel origin with a small Workers OAuth proxy
-   (`workers-oauth-provider`) instead of the portal.
+1. **"Couldn't register with …'s sign-in service" at Connect** → Dynamic Client Registration
+   rejected. Fix: allowlist Claude's callback URIs (Phase 3.3). Diagnose by POSTing a fake
+   registration to `https://<team>.cloudflareaccess.com/cdn-cgi/access/oauth/registration` —
+   a `redirect_uri is not allowed by the account configuration` body confirms it.
+2. **"Authorization with the MCP server failed" before any login screen** (historical,
+   reported mid-2026, since fixed on Cloudflare's side in this deployment's testing) —
+   caused by a missing `WWW-Authenticate: … resource_metadata=…` header on the portal's 401.
+   Verify with `curl -si -X POST https://mcp.<domain>/mcp | grep -i www-authenticate`; the
+   header should reference `/.well-known/oauth-protected-resource/mcp`. If it's absent:
+   use **Claude Desktop with `mcp-remote`** (config above) as the workaround, or front the
+   tunnel origin with a Workers OAuth proxy (`workers-oauth-provider`) as a last resort.
 
 ---
 
@@ -282,7 +300,9 @@ web connector does not. If you hit this:
 
 | Symptom | Likely cause / fix |
 |---|---|
-| Crash at startup: `no field "streamable_http_json_response"` | Bug in `0.3.1` image's `--json-response` flag — override Post Arguments to `teslamate-mcp http --host 0.0.0.0 --port 8888` (see Phase 1.3) |
+| Crash at startup: `no field "streamable_http_json_response"` | Only on the old upstream `0.3.1` image — upgrade to `ghcr.io/batubozkan/teslamate-mcp:0.4.0+` (or see the historical workaround in Phase 1.3) |
+| Portal shows old tool count after upgrading the container | Sync ran while the container was restarting — re-run **⋯ → Sync capabilities** once `/health` responds |
+| GHCR push from release workflow fails `403 Forbidden` | An existing `teslamate-mcp` package isn't linked to the repo (e.g. orphaned from a deleted repo) — delete the stale package or grant the repo **Write** under the package's *Manage Actions access* |
 | First MCP call hangs (SSE pings only), then every call `500`s | Container can't reach Postgres (e.g. `localhost` in `DATABASE_URL`) — fix the URL host to `192.168.1.100`, then restart the container |
 | `522` on `teslamate-mcp.your-domain.com` | cloudflared container down or wrong service URL in public hostname |
 | `522` on `mcp.your-domain.com` | Portal DNS CNAME missing (should point to `gateway.agents.cloudflare.com`) |
