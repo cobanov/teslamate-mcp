@@ -48,6 +48,14 @@ class Settings(BaseSettings):
         description="Default LIMIT injected into custom SQL queries when absent.",
     )
 
+    enable_charging_writes: bool = Field(
+        default=False,
+        description=(
+            "Register the set_charging_cost write tool. Requires the DB role to "
+            "hold UPDATE (cost) ON charging_processes. Off by default."
+        ),
+    )
+
     report_timezone: str = Field(
         default="UTC",
         description="IANA timezone applied to date bucketing in predefined queries.",

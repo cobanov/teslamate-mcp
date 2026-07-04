@@ -154,6 +154,7 @@ every handler via `ctx.request_context.lifespan_context`.
 | `query_timeout_ms` | `QUERY_TIMEOUT_MS` | `5000` | `statement_timeout` for `run_sql` only |
 | `custom_sql_row_limit` | `CUSTOM_SQL_ROW_LIMIT` | `1000` | auto-`LIMIT` for `run_sql` |
 | `report_timezone` | `REPORT_TIMEZONE` | `UTC` | IANA name; binds to the reserved `%(tz)s` placeholder |
+| `enable_charging_writes` | `ENABLE_CHARGING_WRITES` | `False` | registers `set_charging_cost` + receipts prompt |
 | `log_level` | `LOG_LEVEL` | `INFO` | |
 | `debug` | `DEBUG` | `False` | Starlette debug |
 
@@ -161,9 +162,13 @@ every handler via `ctx.request_context.lifespan_context`.
 
 **`build_pool(settings)`** → `AsyncConnectionPool(open=False, row_factory=dict_row)`; opened/closed by the lifespan.
 
-Two execution paths mapped to two trust levels:
-- **`fetch_all(pool, query, params=None)`** — TRUSTED. Bare `execute`/`fetchall`. No read-only wrapper, no timeout.
-  Used by predefined tools + schema query. **Must never receive user SQL.**
+Three execution paths mapped to trust levels:
+- **`fetch_all(pool, query, params=None)`** — TRUSTED reads. Bare `execute`/`fetchall`. No read-only wrapper, no
+  timeout. Used by predefined tools + schema query. **Must never receive user SQL.**
+- **`execute_write(pool, query, params)`** — TRUSTED writes (0.5.0+). Parameterized UPDATE ... RETURNING,
+  committed. The ONLY write path; sole caller is `tools/charging_write.py` (gated by
+  `Settings.enable_charging_writes`). Real boundary: the DB role's column-scoped grant
+  (`GRANT UPDATE (cost) ON charging_processes`).
 - **`fetch_readonly(pool, query, statement_timeout_ms)`** — UNTRUSTED. `set_autocommit(False)` →
   `transaction(force_rollback=True)` → `SET TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` +
   `lock_timeout=2000` (hardcoded) + `idle_in_transaction_session_timeout`. **Always rolled back**, even on

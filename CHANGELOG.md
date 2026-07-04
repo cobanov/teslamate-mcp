@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-04
+
+### Added
+- **Opt-in charging-cost writes**: new `set_charging_cost(charging_process_id, cost)` tool and
+  a `backfill_costs_from_receipts` prompt, registered only when `ENABLE_CHARGING_WRITES=true`
+  (default off). Designed for the receipt-backfill workflow: match receipts to sessions with
+  `search_charging_sessions`, then write each price. Writes go through a dedicated
+  `db.execute_write` path (parameterized UPDATE ... RETURNING, committed); the recommended
+  database boundary is a column-scoped grant — `GRANT UPDATE (cost) ON charging_processes TO
+  <role>;` — so nothing outside that single column can ever be modified, regardless of code.
+  `run_sql` remains READ ONLY + forced rollback; the declarative query registry remains
+  read-only by design. Tests cover flag gating, the end-to-end write, and prove the
+  column-scoped grant blocks writes to other columns.
+
 ## [0.4.0] - 2026-07-04
 
 ### Added

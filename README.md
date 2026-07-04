@@ -103,6 +103,7 @@ All settings are read from environment variables (`.env` supported). Only `DATAB
 | `QUERY_TIMEOUT_MS`      | `5000`      | `statement_timeout` for `run_sql`                           |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | LIMIT injected when `run_sql` doesn't supply one            |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for daily/weekly/monthly report buckets       |
+| `ENABLE_CHARGING_WRITES`| `false`     | Register `set_charging_cost` (needs the UPDATE(cost) grant) |
 | `LOG_LEVEL`             | `INFO`      | Standard Python log level                                   |
 | `DEBUG`                 | `false`     | Starlette debug mode (keep off in production)               |
 
@@ -142,6 +143,22 @@ tool with no arguments returns the full classic report.
 
 - `get_database_schema([table])` — compact table list, or full column detail for one table
 - `run_sql(query)` — execute a custom `SELECT` or `WITH … SELECT`
+
+### Write tools (opt-in, off by default)
+
+Set `ENABLE_CHARGING_WRITES=true` to register **`set_charging_cost(charging_process_id, cost)`**
+— sets the total cost of one charging session (the same field TeslaMate's UI edits), plus a
+`backfill_costs_from_receipts` prompt that guides the receipt→session matching workflow.
+
+Grant the database role write access to **that single column only** (the real security
+boundary — nothing else can ever be written):
+
+```sql
+GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;
+```
+
+`run_sql` stays read-only regardless (READ ONLY transaction + forced rollback), and the
+declarative query registry never writes.
 
 ## Adding a new query
 

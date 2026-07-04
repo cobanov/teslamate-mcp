@@ -39,6 +39,24 @@ async def fetch_all(
     return rows_to_jsonable(rows)
 
 
+async def execute_write(
+    pool: AsyncConnectionPool,
+    query: str,
+    params: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Run a trusted, parameterized write and COMMIT; return RETURNING rows.
+
+    This is the ONLY sanctioned write path in the codebase. Callers are
+    hand-written tools gated by Settings.enable_charging_writes; the DB role's
+    column-scoped grant (e.g. UPDATE (cost) ON charging_processes) is the real
+    boundary. Never route user-supplied SQL through here.
+    """
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(query, params)
+        rows = await cur.fetchall() if cur.description is not None else []
+    return rows_to_jsonable(rows)
+
+
 async def fetch_readonly(
     pool: AsyncConnectionPool,
     query: str,

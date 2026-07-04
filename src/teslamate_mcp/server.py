@@ -18,6 +18,7 @@ from .resources import register_resources
 from .schema import load_schema
 from .tools import (
     discover_predefined_tools,
+    register_charging_write_tools,
     register_custom_sql,
     register_predefined_tools,
     register_schema_tool,
@@ -70,11 +71,14 @@ def create_server(settings: Settings) -> FastMCP:
         statement_timeout_ms=settings.query_timeout_ms,
         row_limit=settings.custom_sql_row_limit,
     )
+    if settings.enable_charging_writes:
+        register_charging_write_tools(mcp)
     register_resources(mcp, tools)
     register_prompts(mcp)
     logger.info(
-        "Registered %d predefined tools + run_sql + get_database_schema + 2 resources + 6 prompts",
+        "Registered %d predefined tools + run_sql + get_database_schema%s + 2 resources + prompts",
         len(tools),
+        " + set_charging_cost (writes ENABLED)" if settings.enable_charging_writes else "",
     )
 
     return mcp

@@ -296,12 +296,37 @@ Two distinct failures, in the order you're likely to meet them:
 - [ ] Client connected via portal URL; `get_basic_car_information` returns your car
 - [ ] Negative: `run_sql` with `DELETE FROM cars` → rejected (validator + READ ONLY txn)
 
+## Enabling charging-cost writes (0.5.0+, opt-in)
+
+Lets Claude write charging prices into the database — e.g. paste receipts and have it match
+them to sessions (`search_charging_sessions`) and set each cost (`set_charging_cost`).
+
+1. **Grant the single writable column** — TeslaMate Postgres container console
+   (`psql -U teslamate teslamate`):
+   ```sql
+   GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;
+   ```
+   This column-scoped grant is the security boundary: no other table or column can ever be
+   written, regardless of any bug. `run_sql` additionally stays READ ONLY at the
+   transaction level.
+2. **Enable the flag** — teslamate-mcp container → add env `ENABLE_CHARGING_WRITES=true` →
+   Apply.
+3. **Re-sync the portal** — AI controls → MCP servers → teslamate-mcp → ⋯ → Sync
+   capabilities → 26 tools.
+4. claude.ai will ask for approval on each write call (or choose "always allow" for the
+   connector). The portal's per-tool toggle can hide `set_charging_cost` again at any time
+   without touching the server.
+
+Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Claude
+*"Here are my charging receipts — match them to my sessions and set the costs."*
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
 |---|---|
 | Crash at startup: `no field "streamable_http_json_response"` | Only on the old upstream `0.3.1` image — upgrade to `ghcr.io/batubozkan/teslamate-mcp:0.4.0+` (or see the historical workaround in Phase 1.3) |
 | Portal shows old tool count after upgrading the container | Sync ran while the container was restarting — re-run **⋯ → Sync capabilities** once `/health` responds |
+| `set_charging_cost` fails with `InsufficientPrivilege` | The column grant is missing — run `GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;` in the Postgres console |
 | GHCR push from release workflow fails `403 Forbidden` | An existing `teslamate-mcp` package isn't linked to the repo (e.g. orphaned from a deleted repo) — delete the stale package or grant the repo **Write** under the package's *Manage Actions access* |
 | First MCP call hangs (SSE pings only), then every call `500`s | Container can't reach Postgres (e.g. `localhost` in `DATABASE_URL`) — fix the URL host to `192.168.1.100`, then restart the container |
 | `522` on `teslamate-mcp.your-domain.com` | cloudflared container down or wrong service URL in public hostname |

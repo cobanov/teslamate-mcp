@@ -15,9 +15,12 @@ Hatchling build, ruff, pytest + testcontainers. Ships as a console script and a 
 lifespan), `db.py` (pool + two trust-level query paths), `tools/` (registry, `run_sql`, schema tool), and
 `queries/` (23 bundled `.sql`+`.toml` report pairs). Tests use real Postgres via testcontainers.
 
-**Key architectural principle — two trust levels**: bundled `.sql` files are trusted and run via the unguarded
+**Key architectural principle — trust levels**: bundled `.sql` files are trusted and run via the unguarded
 `db.fetch_all()`; arbitrary LLM SQL (`run_sql`) runs via `db.fetch_readonly()`, whose Postgres `READ ONLY` +
-forced-rollback transaction is the real security boundary (regex validation is only defense-in-depth).
+forced-rollback transaction is the real security boundary (regex validation is only defense-in-depth). The sole
+write path is `db.execute_write()`, used only by the opt-in `set_charging_cost` tool
+(`ENABLE_CHARGING_WRITES=true`) and bounded by a column-scoped DB grant (`UPDATE (cost) ON charging_processes`).
+The declarative registry never writes.
 
 **Add a new tool**: drop a `<name>.sql` + `<name>.toml` (`name`, `description`, optional `[[params]]` tables)
 pair into `src/teslamate_mcp/queries/` — auto-discovered and contract-validated on restart, no code change.
