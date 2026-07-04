@@ -50,11 +50,11 @@ Issues = "https://github.com/cobanov/teslamate-mcp/issues"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# The packages include already ships every file under the package dir,
+# including queries/*.sql and *.toml — a force-include of queries/ would
+# duplicate them, which hatchling >= 1.19 rejects at wheel-build time.
 [tool.hatch.build.targets.wheel]
 packages = ["src/teslamate_mcp"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/teslamate_mcp/queries" = "teslamate_mcp/queries"
 
 [dependency-groups]
 dev = [
