@@ -10,6 +10,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from mcp.shared.memory import create_connected_server_and_client_session
+
+from teslamate_mcp.config import Settings
+from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.registry import discover_predefined_tools
 
 # Seeded ids from conftest._SETUP_SQL (SERIAL columns reset on every reseed).
@@ -146,6 +150,26 @@ async def test_report_timezone_shifts_day_buckets(mcp_session) -> None:
     # 22:30 UTC on Jan 15 is 01:30 on Jan 16 in Istanbul (UTC+3).
     assert "2026-01-15" in utc_days and "2026-01-16" not in utc_days
     assert "2026-01-16" in ist_days and "2026-01-15" not in ist_days
+
+
+async def test_sessions_share_one_pool(seeded_database) -> None:
+    """Regression: per-session pools leaked one Postgres connection set per MCP
+    session (clients rarely terminate sessions) until the server ran out of
+    connection slots and the streamable-HTTP transport died."""
+    settings = Settings(database_url=seeded_database)  # type: ignore[call-arg]
+    mcp = create_server(settings)
+    ctx = mcp.teslamate_app_context  # type: ignore[attr-defined]
+    try:
+        for _ in range(3):
+            async with create_connected_server_and_client_session(
+                mcp._mcp_server, raise_exceptions=False
+            ) as session:
+                result = await session.call_tool("get_basic_car_information", {})
+                assert not result.isError
+        # The pool survived every session exit — shared, not per-session.
+        assert not ctx.pool.closed
+    finally:
+        await ctx.pool.close()
 
 
 async def test_schema_tool_compact_and_detail(mcp_session) -> None:

@@ -188,9 +188,13 @@ def mcp_session(seeded_database):
     async def factory(**overrides):
         settings = Settings(database_url=seeded_database, **overrides)  # type: ignore[call-arg]
         mcp = create_server(settings)
-        async with create_connected_server_and_client_session(
-            mcp._mcp_server, raise_exceptions=False
-        ) as session:
-            yield session
+        try:
+            async with create_connected_server_and_client_session(
+                mcp._mcp_server, raise_exceptions=False
+            ) as session:
+                yield session
+        finally:
+            # The shared pool outlives sessions by design; tests must close it.
+            await mcp.teslamate_app_context.pool.close()  # type: ignore[attr-defined]
 
     return factory

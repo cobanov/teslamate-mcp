@@ -328,7 +328,8 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 | Portal shows old tool count after upgrading the container | Sync ran while the container was restarting — re-run **⋯ → Sync capabilities** once `/health` responds |
 | `set_charging_cost` fails with `InsufficientPrivilege` | The column grant is missing — run `GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;` in the Postgres console |
 | GHCR push from release workflow fails `403 Forbidden` | An existing `teslamate-mcp` package isn't linked to the repo (e.g. orphaned from a deleted repo) — delete the stale package or grant the repo **Write** under the package's *Manage Actions access* |
-| First MCP call hangs (SSE pings only), then every call `500`s | Container can't reach Postgres (e.g. `localhost` in `DATABASE_URL`) — fix the URL host to `192.168.1.100`, then restart the container |
+| First MCP call hangs (SSE pings only), then every call `500`s | Container can't reach Postgres (e.g. `localhost` in `DATABASE_URL`) — fix the URL host to `192.168.1.100`, then restart the container (0.5.1+ contains the failure per-call instead of poisoning the transport) |
+| `500` on every request, log shows `Task group is not initialized` + Postgres says `remaining connection slots are reserved` | Pre-0.5.1 per-session pool leak — restart the container to free the connections and upgrade to `0.5.1+` (shared pool) |
 | `522` on `teslamate-mcp.your-domain.com` | cloudflared container down or wrong service URL in public hostname |
 | `522` on `mcp.your-domain.com` | Portal DNS CNAME missing (should point to `gateway.agents.cloudflare.com`) |
 | Container restarts at boot | Bad `DATABASE_URL` (fail-fast) — check container log |

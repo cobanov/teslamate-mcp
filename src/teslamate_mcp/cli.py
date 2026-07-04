@@ -83,6 +83,9 @@ def http(host: str | None, port: int | None, auth_token: str | None, json_respon
     # and mount a small /health probe alongside it.
     app = mcp.streamable_http_app()
     app.router.routes.append(Route("/health", _health, methods=["GET"]))
+    # The shared pool outlives individual MCP sessions; close it when the
+    # ASGI app shuts down.
+    app.add_event_handler("shutdown", mcp.teslamate_app_context.pool.close)  # type: ignore[attr-defined]
 
     token = settings.auth_token.get_secret_value() if settings.auth_token else ""
     if token:

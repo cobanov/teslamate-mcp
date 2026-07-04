@@ -135,9 +135,12 @@ teslamate-mcp/
 
 **Purpose**: Shared bootstrap for both transports.
 **Key export**: `create_server(settings: Settings) -> FastMCP`; `AppContext` dataclass (`pool`, `schema`).
-**Pattern**: `@asynccontextmanager` **lifespan** opens the pool, **pre-loads the full DB schema once at startup**
-(cached on `AppContext.schema`), yields `AppContext`, closes the pool on shutdown. `AppContext` is reachable in
-every handler via `ctx.request_context.lifespan_context`.
+**Pattern (0.5.1+)**: ONE `AppContext` (pool + schema cache) is created in `create_server` and **shared by every
+MCP session** — FastMCP runs the lifespan per *session*, so per-session pools leaked connections until Postgres
+ran out of slots. The lifespan opens the pool idempotently under a lock, loads the schema once, **never raises**
+(a failing init logs, tool calls surface the error per-call, the next session retries), and never closes the
+pool; `cli.py` closes it on ASGI shutdown. `AppContext` is reachable in every handler via
+`ctx.request_context.lifespan_context` and exposed as `mcp.teslamate_app_context` for shutdown hooks/tests.
 **Registration order**: predefined tools → schema tool → custom SQL tool → resources → prompts.
 **Gotcha**: host/port/debug are baked into the FastMCP instance even for `stdio`, where they are unused.
 

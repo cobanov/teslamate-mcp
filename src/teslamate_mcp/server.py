@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -38,22 +39,33 @@ class AppContext:
 def create_server(settings: Settings) -> FastMCP:
     """Build the FastMCP server, wire up the lifespan, and register all tools."""
 
+    # ONE pool + schema cache shared by every MCP session. FastMCP runs the
+    # lifespan per *session*, not per process — opening (and never closing,
+    # since clients rarely terminate sessions) a pool per session leaked
+    # connections until Postgres ran out of slots and the transport died.
+    app_context = AppContext(pool=build_pool(settings))
+    init_lock = asyncio.Lock()
+
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
-        pool = build_pool(settings)
-        await pool.open()
-        logger.info(
-            "Database pool opened (min=%d, max=%d)",
-            settings.pool_min_size,
-            settings.pool_max_size,
-        )
+        # Must never raise: an exception here kills the streamable-HTTP
+        # session manager's task group and 500s every later request. On
+        # failure, yield anyway — individual tool calls then surface the DB
+        # error per call, and the next session retries the init.
         try:
-            schema = await load_schema(pool)
-            logger.info("Loaded schema: %d columns cached", len(schema))
-            yield AppContext(pool=pool, schema=schema)
-        finally:
-            await pool.close()
-            logger.info("Database pool closed")
+            async with init_lock:
+                await app_context.pool.open()  # idempotent on an open pool
+                if app_context.schema is None:
+                    app_context.schema = await load_schema(app_context.pool)
+                    logger.info(
+                        "Database pool opened (min=%d, max=%d); schema cached (%d columns)",
+                        settings.pool_min_size,
+                        settings.pool_max_size,
+                        len(app_context.schema),
+                    )
+        except Exception:
+            logger.exception("Deferred DB init failed; tool calls will error until it succeeds")
+        yield app_context
 
     mcp = FastMCP(
         "teslamate",
@@ -80,5 +92,8 @@ def create_server(settings: Settings) -> FastMCP:
         len(tools),
         " + set_charging_cost (writes ENABLED)" if settings.enable_charging_writes else "",
     )
+
+    # Exposed for process-shutdown hooks (cli.py) and test teardown.
+    mcp.teslamate_app_context = app_context  # type: ignore[attr-defined]
 
     return mcp

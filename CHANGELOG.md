@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-04
+
+### Fixed
+- **Postgres connection exhaustion under real client traffic.** FastMCP runs the lifespan per
+  MCP *session*, and the lifespan opened a new connection pool every time; streamable-HTTP
+  clients (claude.ai, MCP portals) open sessions freely and rarely terminate them, so pools —
+  and their connections — accumulated until Postgres refused new connections
+  (`remaining connection slots are reserved…`), which crashed the transport's task group and
+  turned every subsequent request into `500: Task group is not initialized`. All sessions now
+  share a single pool + schema cache created in `create_server`; the lifespan opens it
+  idempotently, never closes it per-session, and never raises (a failed init logs and retries
+  on the next session, with individual tool calls surfacing the DB error instead of killing
+  the transport). The HTTP app closes the pool on ASGI shutdown.
+
 ## [0.5.0] - 2026-07-04
 
 ### Added
