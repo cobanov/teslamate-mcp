@@ -11,8 +11,9 @@ total_tokens: 19934
 **teslamate-mcp** is a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes a
 [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to AI assistants (Claude Desktop,
 Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search queries with
-typed optional parameters + `run_sql` + `get_database_schema`), **6 prompts**, and **2 resources**. Python 3.11+, built on the official
-`mcp[cli]` SDK (FastMCP) and `psycopg` 3 async pool.
+typed optional parameters + `run_sql` + `get_database_schema`; +1 opt-in write tool `set_charging_cost`),
+**prompts**, and **2 resources**. Python 3.11+, built on the official `mcp[cli]` SDK (FastMCP) and `psycopg` 3
+async pool (one pool shared across all MCP sessions).
 
 ---
 
@@ -99,6 +100,7 @@ teslamate-mcp/
 │   │   ├── __init__.py      # facade re-exporting the registration API
 │   │   ├── registry.py      # .sql+.toml -> MCP tool discovery & registration
 │   │   ├── custom_sql.py    # run_sql tool: validate_sql + enforce_limit
+│   │   ├── charging_write.py# opt-in set_charging_cost + receipts prompt (0.5.0+)
 │   │   └── schema_tool.py   # get_database_schema tool
 │   └── queries/             # 23 × (<name>.sql + <name>.toml) bundled report pairs
 ├── tests/                   # pytest + pytest-asyncio + testcontainers[postgres]
@@ -277,7 +279,8 @@ where applicable (zero-arg calls preserve the classic full report). The `.toml` 
 | `get_charging_curve` | NTILE-downsampled power/SOC curve for one session (**charging_process_id required**) | `charges` |
 | `get_charging_costs` | Cost totals grouped by month/location/car | `charging_processes`, `cars`, `addresses` |
 
-**Plus 2 built-ins**: `get_database_schema(table=None)` and `run_sql(query)` = **25 tools total**.
+**Plus 2 built-ins**: `get_database_schema(table=None)` and `run_sql(query)` = **25 tools total** — 26 when
+`ENABLE_CHARGING_WRITES=true` adds `set_charging_cost` (plus the `backfill_costs_from_receipts` prompt).
 
 ### Inferred TeslaMate schema
 

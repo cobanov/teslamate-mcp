@@ -5,8 +5,9 @@
 **teslamate-mcp** is a Model Context Protocol (MCP) server that exposes a TeslaMate PostgreSQL database to AI
 assistants over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search
 queries defined as `.sql`/`.toml` file pairs with typed optional params + `run_sql` for arbitrary read-only SQL +
-`get_database_schema`), **6 prompts**, and **2 resources**. Built on the official `mcp[cli]` SDK (FastMCP) with a
-`psycopg` 3 async connection pool.
+`get_database_schema`; +1 opt-in write tool `set_charging_cost` behind `ENABLE_CHARGING_WRITES`), **prompts**,
+and **2 resources**. Built on the official `mcp[cli]` SDK (FastMCP) with a single `psycopg` 3 async pool shared
+across all MCP sessions (per-session pools leaked connections — fixed in 0.5.1, don't regress this).
 
 **Stack**: Python 3.11+, FastMCP (`mcp[cli]`), psycopg 3 + psycopg-pool, pydantic-settings, click, Starlette/uvicorn.
 Hatchling build, ruff, pytest + testcontainers. Ships as a console script and a multi-arch Docker image on GHCR.

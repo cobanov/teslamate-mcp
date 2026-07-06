@@ -115,7 +115,7 @@ Option B — manual (**Docker → Add Container**):
 
 ```bash
 curl http://192.168.1.100:8888/health
-# → {"status":"ok","version":"0.4.0"}
+# → {"status":"ok","version":"0.5.1"}   (or newer)
 
 curl -i http://192.168.1.100:8888/mcp
 # → HTTP 401 (bearer auth active)
@@ -292,7 +292,7 @@ Two distinct failures, in the order you're likely to meet them:
 - [ ] `curl https://teslamate-mcp.your-domain.com/health` → 200 (tunnel)
 - [ ] `curl https://teslamate-mcp.your-domain.com/mcp` without token → **401**
 - [ ] MCP initialize with bearer token → success (Phase 2.4)
-- [ ] Portal dashboard: server **Ready**, 25 tools synced (0.4.0+)
+- [ ] Portal dashboard: server **Ready**, 25 tools synced (26 with `ENABLE_CHARGING_WRITES=true`, 0.5.0+)
 - [ ] Client connected via portal URL; `get_basic_car_information` returns your car
 - [ ] Negative: `run_sql` with `DELETE FROM cars` → rejected (validator + READ ONLY txn)
 
