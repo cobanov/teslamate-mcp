@@ -60,7 +60,20 @@ def stdio() -> None:
     default=False,
     help="Return JSON instead of streaming SSE.",
 )
-def http(host: str | None, port: int | None, auth_token: str | None, json_response: bool) -> None:
+@click.option(
+    "--stateless/--stateful",
+    "stateless",
+    default=False,
+    help="Serve legacy-era clients without per-session state (2026-07-28 era "
+    "requests are always stateless).",
+)
+def http(
+    host: str | None,
+    port: int | None,
+    auth_token: str | None,
+    json_response: bool,
+    stateless: bool,
+) -> None:
     """Run the MCP server over streamable HTTP (for remote deployments)."""
     settings = load_settings()
     if host is not None:
@@ -75,17 +88,17 @@ def http(host: str | None, port: int | None, auth_token: str | None, json_respon
     _configure_logging(settings.log_level)
     mcp = create_server(settings)
 
-    # Must be set before streamable_http_app(): the session manager is built
-    # lazily on the first call and reads json_response at construction time.
-    mcp.settings.json_response = json_response
-
-    # FastMCP exposes a Starlette app for streamable-http; we wrap it for auth
-    # and mount a small /health probe alongside it.
-    app = mcp.streamable_http_app()
+    # MCPServer exposes a Starlette app for streamable-http; we wrap it for
+    # auth and mount a small /health probe alongside it. The app's lifespan
+    # runs the server lifespan once per process, which opens and closes the
+    # shared pool. Passing the bind host lets the SDK auto-enable DNS-rebinding
+    # protection for localhost binds (it stays off for 0.0.0.0 behind a proxy).
+    app = mcp.streamable_http_app(
+        json_response=json_response,
+        stateless_http=stateless,
+        host=settings.host,
+    )
     app.router.routes.append(Route("/health", _health, methods=["GET"]))
-    # The shared pool outlives individual MCP sessions; close it when the
-    # ASGI app shuts down.
-    app.add_event_handler("shutdown", mcp.teslamate_app_context.pool.close)  # type: ignore[attr-defined]
 
     token = settings.auth_token.get_secret_value() if settings.auth_token else ""
     if token:

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ..schema import load_schema
 
+logger = logging.getLogger(__name__)
 
-def register_schema_tool(mcp: FastMCP) -> None:
+
+def register_schema_tool(mcp: MCPServer) -> None:
     """Register `get_database_schema` on the given server.
 
     The schema is fetched once at startup (cached on the lifespan context) so
@@ -20,10 +23,10 @@ def register_schema_tool(mcp: FastMCP) -> None:
     """
 
     annotations = ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 
     description = (
@@ -43,7 +46,7 @@ def register_schema_tool(mcp: FastMCP) -> None:
     ) -> list[dict[str, Any]]:
         lifespan_ctx = ctx.request_context.lifespan_context
         if lifespan_ctx.schema is None:
-            await ctx.info("Schema cache cold — querying information_schema")
+            logger.info("Schema cache cold — querying information_schema")
             lifespan_ctx.schema = await load_schema(lifespan_ctx.pool)
         rows = lifespan_ctx.schema
 
@@ -58,7 +61,7 @@ def register_schema_tool(mcp: FastMCP) -> None:
                 {"table_schema": schema, "table_name": name, "column_count": count}
                 for (schema, name), count in counts.items()
             ]
-            await ctx.info(f"Returning compact schema for {len(summary)} tables")
+            logger.info("Returning compact schema for %d tables", len(summary))
             return summary
 
         wanted = table.lower()
@@ -68,7 +71,7 @@ def register_schema_tool(mcp: FastMCP) -> None:
                 f"Unknown table {table!r}. Call get_database_schema without "
                 "arguments to list available tables."
             )
-        await ctx.info(f"Returning {len(detail)} columns for table {table!r}")
+        logger.info("Returning %d columns for table %r", len(detail), table)
         return detail
 
     get_database_schema.__annotations__["ctx"] = Context

@@ -23,7 +23,7 @@ try:  # pragma: no cover - import guarded so unit tests run without Docker
 except ImportError:  # pragma: no cover
     _HAS_TESTCONTAINERS = False
 
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from teslamate_mcp.config import Settings
 from teslamate_mcp.db import build_pool
@@ -178,9 +178,9 @@ async def seeded_database(database_url) -> str:
 
 @pytest.fixture
 def mcp_session(seeded_database):
-    """Factory: an initialized in-memory MCP client session against a real server.
+    """Factory: an initialized in-memory MCP client against a real server.
 
-    Runs the full FastMCP stack (lifespan, pool, tool dispatch) without HTTP.
+    Runs the full MCPServer stack (lifespan, pool, tool dispatch) without HTTP.
     Accepts Settings overrides, e.g. mcp_session(report_timezone="Europe/Istanbul").
     """
 
@@ -189,12 +189,11 @@ def mcp_session(seeded_database):
         settings = Settings(database_url=seeded_database, **overrides)  # type: ignore[call-arg]
         mcp = create_server(settings)
         try:
-            async with create_connected_server_and_client_session(
-                mcp._mcp_server, raise_exceptions=False
-            ) as session:
-                yield session
+            async with Client(mcp, raise_exceptions=False) as client:
+                yield client
         finally:
-            # The shared pool outlives sessions by design; tests must close it.
+            # The lifespan closes the pool on client exit; this covers the
+            # case where connection setup failed partway through.
             await mcp.teslamate_app_context.pool.close()  # type: ignore[attr-defined]
 
     return factory

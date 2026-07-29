@@ -8,13 +8,16 @@ boundary — even a bug here cannot touch anything else.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ..db import execute_write
+
+logger = logging.getLogger(__name__)
 
 _SET_COST_SQL = """
 UPDATE charging_processes
@@ -28,14 +31,14 @@ RETURNING id AS charging_process_id,
 """
 
 
-def register_charging_write_tools(mcp: FastMCP) -> None:
+def register_charging_write_tools(mcp: MCPServer) -> None:
     """Register `set_charging_cost` and its receipt-backfill prompt."""
 
     annotations = ToolAnnotations(
-        readOnlyHint=False,
-        destructiveHint=True,  # overwrites any previously stored cost
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=True,  # overwrites any previously stored cost
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 
     description = (
@@ -59,7 +62,7 @@ def register_charging_write_tools(mcp: FastMCP) -> None:
         ),
     ) -> list[dict[str, Any]]:
         pool = ctx.request_context.lifespan_context.pool
-        await ctx.info(f"Setting cost of charging session {charging_process_id} to {cost}")
+        logger.info("Setting cost of charging session %d to %s", charging_process_id, cost)
         rows = await execute_write(
             pool,
             _SET_COST_SQL,
@@ -70,7 +73,7 @@ def register_charging_write_tools(mcp: FastMCP) -> None:
                 f"No charging session with id {charging_process_id}. "
                 "Find ids with search_charging_sessions."
             )
-        await ctx.info(f"Charging session {charging_process_id} updated")
+        logger.info("Charging session %d updated", charging_process_id)
         return rows
 
     set_charging_cost.__annotations__["ctx"] = Context

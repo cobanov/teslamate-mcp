@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from typing import Any
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ..db import fetch_readonly
+
+logger = logging.getLogger(__name__)
 
 _FORBIDDEN_KEYWORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE|"
@@ -79,7 +82,7 @@ def enforce_limit(sql: str, default_limit: int) -> str:
 
 
 def register_custom_sql(
-    mcp: FastMCP,
+    mcp: MCPServer,
     *,
     statement_timeout_ms: int,
     row_limit: int,
@@ -87,10 +90,10 @@ def register_custom_sql(
     """Register the `run_sql` tool on the given server."""
 
     annotations = ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=False,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
     )
 
     description = (
@@ -112,18 +115,18 @@ def register_custom_sql(
         try:
             validate_sql(query)
         except SqlValidationError as exc:
-            await ctx.warning(f"run_sql rejected query: {exc}")
+            logger.warning("run_sql rejected query: %s", exc)
             raise
         capped = enforce_limit(query, row_limit)
         pool = ctx.request_context.lifespan_context.pool
 
-        await ctx.info(
-            f"run_sql executing {len(query)}-char query (timeout {statement_timeout_ms}ms)"
+        logger.info(
+            "run_sql executing %d-char query (timeout %dms)", len(query), statement_timeout_ms
         )
         start = time.perf_counter()
         rows = await fetch_readonly(pool, capped, statement_timeout_ms)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
-        await ctx.info(f"run_sql returned {len(rows)} row(s) in {elapsed_ms}ms")
+        logger.info("run_sql returned %d row(s) in %dms", len(rows), elapsed_ms)
         return rows
 
     run_sql.__annotations__["ctx"] = Context

@@ -10,7 +10,7 @@ _DUMMY_DB_URL = "postgresql://teslamate:secret@localhost:5432/teslamate"
 
 
 def _invoke_http(monkeypatch, args: list[str]) -> tuple[object, dict]:
-    """Run the `http` command with uvicorn stubbed out; capture the FastMCP instance."""
+    """Run the `http` command with uvicorn stubbed out; capture the MCPServer instance."""
     captured: dict = {}
 
     real_create_server = cli.create_server
@@ -32,15 +32,13 @@ def _invoke_http(monkeypatch, args: list[str]) -> tuple[object, dict]:
 
 
 def test_http_json_response_flag_starts_cleanly(monkeypatch):
-    """Regression: `http --json-response` crashed with ValueError on FastMCP settings.
-
-    The old code assigned a nonexistent field (streamable_http_json_response) and
-    did so after streamable_http_app() had already built the session manager.
-    """
+    """Regression: `http --json-response` once crashed before reaching the
+    session manager. Under SDK v2 the flag is a streamable_http_app() kwarg;
+    assert it actually lands on the built session manager."""
     result, captured = _invoke_http(monkeypatch, ["--json-response"])
 
     assert result.exit_code == 0, result.output
-    assert captured["mcp"].settings.json_response is True
+    assert captured["mcp"].session_manager.json_response is True
     assert captured["app"] is not None
 
 
@@ -48,7 +46,15 @@ def test_http_defaults_to_sse_response(monkeypatch):
     result, captured = _invoke_http(monkeypatch, [])
 
     assert result.exit_code == 0, result.output
-    assert captured["mcp"].settings.json_response is False
+    assert captured["mcp"].session_manager.json_response is False
+    assert captured["mcp"].session_manager.stateless is False
+
+
+def test_http_stateless_flag_reaches_session_manager(monkeypatch):
+    result, captured = _invoke_http(monkeypatch, ["--stateless"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["mcp"].session_manager.stateless is True
 
 
 def test_gen_token_prints_env_line():

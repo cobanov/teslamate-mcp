@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import re
 import tomllib
 from dataclasses import dataclass, field
@@ -10,11 +11,13 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ..db import fetch_all
+
+logger = logging.getLogger(__name__)
 
 _PARAM_TYPES: dict[str, type] = {
     "string": str,
@@ -28,7 +31,7 @@ _PLACEHOLDER_RE = re.compile(r"%\((\w+)\)s")
 # psycopg's client-side substitution once a params argument is supplied.
 _STRAY_PERCENT_RE = re.compile(r"(?<!%)%(?![%(])")
 # "tz" is injected by the registry from Settings.report_timezone; "ctx" is the
-# FastMCP context argument. Neither may be declared as a user-facing param.
+# MCP context argument. Neither may be declared as a user-facing param.
 _RESERVED_PARAM_NAMES = frozenset({"ctx", "tz"})
 _ALLOWED_PARAM_KEYS = frozenset(
     {"name", "type", "description", "required", "default", "minimum", "maximum", "enum"}
@@ -238,9 +241,9 @@ def _annotation_for(param: ToolParam) -> Any:
 
 
 def _build_signature(tool: PredefinedTool) -> inspect.Signature:
-    """Craft the signature FastMCP introspects to build the tool's input schema.
+    """Craft the signature the SDK introspects to build the tool's input schema.
 
-    ctx must be the FIRST parameter (FastMCP's Context detection stops there) and
+    ctx must be the FIRST parameter (the SDK's Context detection stops there) and
     defaults must live on inspect.Parameter, never inside Field() — pydantic 2
     rejects a default in both places.
     """
@@ -262,19 +265,19 @@ def _build_signature(tool: PredefinedTool) -> inspect.Signature:
 
 
 def register_predefined_tools(
-    mcp: FastMCP, tools: list[PredefinedTool], *, report_timezone: str
+    mcp: MCPServer, tools: list[PredefinedTool], *, report_timezone: str
 ) -> None:
-    """Attach each predefined tool to the FastMCP server.
+    """Attach each predefined tool to the MCP server.
 
     A small factory captures the SQL per tool so the registered coroutine
     closes over only its own query — without a factory, every registered
     coroutine would share the loop variable and run the same SQL.
     """
     annotations = ToolAnnotations(
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 
     for tool in tools:
@@ -282,7 +285,7 @@ def register_predefined_tools(
 
 
 def _register_one(
-    mcp: FastMCP,
+    mcp: MCPServer,
     tool: PredefinedTool,
     annotations: ToolAnnotations,
     *,
@@ -293,16 +296,16 @@ def _register_one(
         bound = {p.name: params.get(p.name, p.default) for p in tool.params}
         if tool.uses_tz:
             bound["tz"] = report_timezone
-        await ctx.info(f"Running {tool.name} ({tool.source})")
+        logger.info("Running %s (%s)", tool.name, tool.source)
         # `or None` keeps psycopg's %-escaping rules off for param-less SQL.
         rows = await fetch_all(pool, tool.sql, bound or None)
-        await ctx.info(f"{tool.name} returned {len(rows)} row(s)")
+        logger.info("%s returned %d row(s)", tool.name, len(rows))
         return rows
 
     handler.__name__ = tool.name
     handler.__doc__ = tool.description
     # The crafted signature (real annotation objects, not strings) is what
-    # FastMCP introspects — it both excludes ctx from the client-facing schema
+    # the SDK introspects — it both excludes ctx from the client-facing schema
     # and surfaces the declared params with types, defaults, and constraints.
     handler.__signature__ = _build_signature(tool)  # type: ignore[attr-defined]
     mcp.tool(name=tool.name, description=tool.description, annotations=annotations)(handler)

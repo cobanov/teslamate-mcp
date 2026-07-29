@@ -1,17 +1,18 @@
-"""FastMCP server factory and lifespan management."""
+"""MCPServer factory and lifespan management."""
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.server import CacheHint
 from psycopg_pool import AsyncConnectionPool
 
+from . import __version__
 from .config import Settings
 from .db import build_pool
 from .prompts import register_prompts
@@ -27,6 +28,19 @@ from .tools import (
 
 logger = logging.getLogger(__name__)
 
+# The tool/prompt/resource registry is fixed for the lifetime of the process
+# (queries are bundled files, discovered once at startup), so clients may cache
+# list results for a long time. "private" because the endpoint is authenticated.
+_LIST_CACHE_HINT = CacheHint(ttl_ms=3_600_000, scope="private")
+_CACHE_HINTS = {
+    "server/discover": _LIST_CACHE_HINT,
+    "tools/list": _LIST_CACHE_HINT,
+    "prompts/list": _LIST_CACHE_HINT,
+    "resources/list": _LIST_CACHE_HINT,
+    "resources/templates/list": _LIST_CACHE_HINT,
+    "resources/read": _LIST_CACHE_HINT,
+}
+
 
 @dataclass
 class AppContext:
@@ -36,43 +50,43 @@ class AppContext:
     schema: list[dict[str, Any]] | None = field(default=None)
 
 
-def create_server(settings: Settings) -> FastMCP:
-    """Build the FastMCP server, wire up the lifespan, and register all tools."""
+def create_server(settings: Settings) -> MCPServer:
+    """Build the MCPServer, wire up the lifespan, and register all tools."""
 
-    # ONE pool + schema cache shared by every MCP session. FastMCP runs the
-    # lifespan per *session*, not per process — opening (and never closing,
-    # since clients rarely terminate sessions) a pool per session leaked
-    # connections until Postgres ran out of slots and the transport died.
     app_context = AppContext(pool=build_pool(settings))
-    init_lock = asyncio.Lock()
 
     @asynccontextmanager
-    async def lifespan(_server: FastMCP) -> AsyncIterator[AppContext]:
-        # Must never raise: an exception here kills the streamable-HTTP
-        # session manager's task group and 500s every later request. On
-        # failure, yield anyway — individual tool calls then surface the DB
-        # error per call, and the next session retries the init.
+    async def lifespan(_server: MCPServer) -> AsyncIterator[AppContext]:
+        # On HTTP and stdio, SDK v2 enters this once per process; the in-memory
+        # transport (tests) enters it once per sequential client connection, so
+        # a closed pool is rebuilt on re-entry (psycopg pools cannot reopen).
+        # Must never raise: a database that is down at boot should degrade to
+        # per-call tool errors, not kill the transport — get_database_schema
+        # lazily retries the schema load on first use.
+        if app_context.pool.closed:
+            app_context.pool = build_pool(settings)
         try:
-            async with init_lock:
-                await app_context.pool.open()  # idempotent on an open pool
-                if app_context.schema is None:
-                    app_context.schema = await load_schema(app_context.pool)
-                    logger.info(
-                        "Database pool opened (min=%d, max=%d); schema cached (%d columns)",
-                        settings.pool_min_size,
-                        settings.pool_max_size,
-                        len(app_context.schema),
-                    )
+            await app_context.pool.open()
+            app_context.schema = await load_schema(app_context.pool)
+            logger.info(
+                "Database pool opened (min=%d, max=%d); schema cached (%d columns)",
+                settings.pool_min_size,
+                settings.pool_max_size,
+                len(app_context.schema),
+            )
         except Exception:
-            logger.exception("Deferred DB init failed; tool calls will error until it succeeds")
-        yield app_context
+            logger.exception("DB init failed; tool calls will error until the DB is reachable")
+        try:
+            yield app_context
+        finally:
+            await app_context.pool.close()
 
-    mcp = FastMCP(
+    mcp = MCPServer(
         "teslamate",
+        version=__version__,
         lifespan=lifespan,
-        host=settings.host,
-        port=settings.port,
         debug=settings.debug,
+        cache_hints=_CACHE_HINTS,
     )
 
     tools = discover_predefined_tools()

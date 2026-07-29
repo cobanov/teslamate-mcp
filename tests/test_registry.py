@@ -66,12 +66,12 @@ async def test_tool_schemas_do_not_expose_context_argument() -> None:
     mcp = create_server(settings)
 
     for tool in await mcp.list_tools():
-        schema = tool.inputSchema
+        schema = tool.input_schema
         assert "ctx" not in schema.get("properties", {}), tool.name
         assert "ctx" not in schema.get("required", []), tool.name
 
     tools = {tool.name: tool for tool in await mcp.list_tools()}
-    assert tools["run_sql"].inputSchema["required"] == ["query"]
+    assert tools["run_sql"].input_schema["required"] == ["query"]
 
 
 @pytest.mark.asyncio
@@ -80,7 +80,7 @@ async def test_parameterized_tool_schemas() -> None:
     mcp = create_server(settings)
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
-    search = tools["search_drives"].inputSchema
+    search = tools["search_drives"].input_schema
     props = search["properties"]
     assert {"type": "string"} in props["car_name"]["anyOf"]  # nullable string
     assert props["car_name"]["default"] is None
@@ -91,16 +91,16 @@ async def test_parameterized_tool_schemas() -> None:
     assert props["order_by"]["default"] == "start_date"
     assert search.get("required", []) == []
 
-    details = tools["get_drive_details"].inputSchema
+    details = tools["get_drive_details"].input_schema
     assert details["required"] == ["drive_id"]
     assert details["properties"]["drive_id"]["type"] == "integer"
 
-    degradation = tools["get_battery_degradation_over_time"].inputSchema
+    degradation = tools["get_battery_degradation_over_time"].input_schema
     assert degradation["properties"]["days"]["default"] == 730
 
-    costs = tools["get_charging_costs"].inputSchema
+    costs = tools["get_charging_costs"].input_schema
     assert costs["properties"]["group_by"]["enum"] == ["month", "location", "car"]
 
-    schema_tool = tools["get_database_schema"].inputSchema
+    schema_tool = tools["get_database_schema"].input_schema
     assert "table" in schema_tool["properties"]
     assert "table" not in schema_tool.get("required", [])

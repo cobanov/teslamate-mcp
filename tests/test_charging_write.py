@@ -27,12 +27,12 @@ async def test_write_tool_schema_when_enabled() -> None:
     tools = {tool.name: tool for tool in await mcp.list_tools()}
 
     tool = tools["set_charging_cost"]
-    schema = tool.inputSchema
+    schema = tool.input_schema
     assert sorted(schema["required"]) == ["charging_process_id", "cost"]
     assert "ctx" not in schema.get("properties", {})
     assert schema["properties"]["cost"]["minimum"] == 0
-    assert tool.annotations.readOnlyHint is False
-    assert tool.annotations.destructiveHint is True
+    assert tool.annotations.read_only_hint is False
+    assert tool.annotations.destructive_hint is True
 
     prompts = {p.name for p in await mcp.list_prompts()}
     assert "backfill_costs_from_receipts" in prompts
@@ -52,25 +52,25 @@ async def test_set_charging_cost_e2e(mcp_session) -> None:
         result = await session.call_tool(
             "set_charging_cost", {"charging_process_id": 3, "cost": 42.5}
         )
-        assert not result.isError, [getattr(c, "text", c) for c in result.content]
-        (row,) = result.structuredContent["result"]
+        assert not result.is_error, [getattr(c, "text", c) for c in result.content]
+        (row,) = result.structured_content["result"]
         assert row["charging_process_id"] == 3
         assert row["cost"] == 42.5
 
         # The change is committed and visible to the read tools.
         costs = await session.call_tool("get_charging_costs", {"group_by": "car"})
-        by_key = {r["group_key"]: r for r in costs.structuredContent["result"]}
+        by_key = {r["group_key"]: r for r in costs.structured_content["result"]}
         assert by_key["Red Rocket"]["total_cost"] == 42.5
 
         unknown = await session.call_tool(
             "set_charging_cost", {"charging_process_id": 999999, "cost": 5}
         )
-        assert unknown.isError
+        assert unknown.is_error
 
         negative = await session.call_tool(
             "set_charging_cost", {"charging_process_id": 3, "cost": -1}
         )
-        assert negative.isError  # pydantic ge=0
+        assert negative.is_error  # pydantic ge=0
 
 
 async def test_column_scoped_grant_is_the_real_boundary(pool, database_url) -> None:

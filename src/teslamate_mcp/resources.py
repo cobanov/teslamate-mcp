@@ -1,6 +1,6 @@
 """MCP resources: predefined-query metadata exposed by URI.
 
-Resource handlers in FastMCP cannot receive a Context, so anything that needs
+Resource handlers in the SDK cannot receive a Context, so anything that needs
 runtime database access (like the live schema) stays in tool form. The
 resources here are derived purely from the bundled SQL + TOML files, so they
 are safe to serve as static-content URIs.
@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ResourceNotFoundError
 
 from .tools.registry import PredefinedTool
 
 
-def register_resources(mcp: FastMCP, tools: list[PredefinedTool]) -> None:
+def register_resources(mcp: MCPServer, tools: list[PredefinedTool]) -> None:
     """Expose the list of predefined queries and each query's raw SQL."""
 
     by_name: dict[str, PredefinedTool] = {t.name: t for t in tools}
@@ -48,4 +49,4 @@ def register_resources(mcp: FastMCP, tools: list[PredefinedTool]) -> None:
         try:
             return by_name[name].sql
         except KeyError as exc:
-            raise ValueError(f"Unknown query: {name}") from exc
+            raise ResourceNotFoundError(f"Unknown query: {name}") from exc

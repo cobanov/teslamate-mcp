@@ -1,6 +1,6 @@
 [project]
 name = "teslamate-mcp"
-version = "0.5.1"
+version = "0.6.0"
 description = "A Model Context Protocol (MCP) server that exposes your TeslaMate database to AI assistants over stdio and streamable HTTP."
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,7 +28,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "mcp[cli]>=1.10.1",
+    "mcp[cli]>=2.0.0,<3",
     "psycopg[binary]>=3.2.9",
     "psycopg-pool>=3.2.0",
     "pydantic>=2.8",

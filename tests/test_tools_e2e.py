@@ -1,7 +1,7 @@
-"""End-to-end tool tests against a real Postgres via an in-memory MCP session.
+"""End-to-end tool tests against a real Postgres via an in-memory MCP client.
 
-These run the full FastMCP stack (lifespan, pool, dispatch, param binding) and
-are the safety net for SQL-level mistakes: missing ::casts on NULL params,
+These run the full MCPServer stack (lifespan, pool, dispatch, param binding)
+and are the safety net for SQL-level mistakes: missing ::casts on NULL params,
 unescaped %, and column typos across all bundled queries.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp import Client
 
 from teslamate_mcp.config import Settings
 from teslamate_mcp.server import create_server
@@ -23,9 +23,9 @@ _REQUIRED_ARG_SEEDS = {"drive_id": _TZ_BOUNDARY_DRIVE_ID, "charging_process_id":
 
 
 def rows_from(result) -> list[dict[str, Any]]:
-    assert not result.isError, [getattr(c, "text", c) for c in result.content]
-    if result.structuredContent is not None:
-        return result.structuredContent["result"]
+    assert not result.is_error, [getattr(c, "text", c) for c in result.content]
+    if result.structured_content is not None:
+        return result.structured_content["result"]
     return [json.loads(c.text) for c in result.content]
 
 
@@ -34,7 +34,7 @@ async def test_every_predefined_tool_runs_with_defaults(mcp_session) -> None:
         for tool in discover_predefined_tools():
             args = {p.name: _REQUIRED_ARG_SEEDS[p.name] for p in tool.params if p.required}
             result = await session.call_tool(tool.name, args)
-            assert not result.isError, (
+            assert not result.is_error, (
                 tool.name,
                 [getattr(c, "text", c) for c in result.content],
             )
@@ -108,7 +108,7 @@ async def test_get_drive_details(mcp_session) -> None:
 async def test_missing_required_arg_errors(mcp_session) -> None:
     async with mcp_session() as session:
         result = await session.call_tool("get_drive_details", {})
-        assert result.isError
+        assert result.is_error
 
 
 async def test_charging_curve_downsamples(mcp_session) -> None:
@@ -128,7 +128,7 @@ async def test_charging_curve_downsamples(mcp_session) -> None:
             "get_charging_curve",
             {"charging_process_id": _CURVE_SESSION_ID, "max_points": 5},
         )
-        assert below_minimum.isError  # contract minimum is 10
+        assert below_minimum.is_error  # contract minimum is 10
 
 
 async def test_charging_costs_group_by(mcp_session) -> None:
@@ -152,24 +152,24 @@ async def test_report_timezone_shifts_day_buckets(mcp_session) -> None:
     assert "2026-01-16" in ist_days and "2026-01-15" not in ist_days
 
 
-async def test_sessions_share_one_pool(seeded_database) -> None:
-    """Regression: per-session pools leaked one Postgres connection set per MCP
-    session (clients rarely terminate sessions) until the server ran out of
-    connection slots and the streamable-HTTP transport died."""
+async def test_sequential_sessions_do_not_leak_pools(seeded_database) -> None:
+    """Regression (0.5.1): pools opened per MCP session leaked connections
+    until Postgres ran out of slots. Under SDK v2 the lifespan owns the pool:
+    HTTP/stdio enter it once per process; the in-memory transport enters it
+    per client connection and must close the pool on every exit."""
     settings = Settings(database_url=seeded_database)  # type: ignore[call-arg]
     mcp = create_server(settings)
     ctx = mcp.teslamate_app_context  # type: ignore[attr-defined]
     try:
         for _ in range(3):
-            async with create_connected_server_and_client_session(
-                mcp._mcp_server, raise_exceptions=False
-            ) as session:
+            async with Client(mcp, raise_exceptions=False) as session:
                 result = await session.call_tool("get_basic_car_information", {})
-                assert not result.isError
-        # The pool survived every session exit — shared, not per-session.
-        assert not ctx.pool.closed
+                assert not result.is_error
+            # Each connection's lifespan exit released its pool — no leaks.
+            assert mcp.teslamate_app_context.pool.closed  # type: ignore[attr-defined]
     finally:
-        await ctx.pool.close()
+        await mcp.teslamate_app_context.pool.close()  # type: ignore[attr-defined]
+    assert ctx is mcp.teslamate_app_context  # one shared AppContext throughout
 
 
 async def test_schema_tool_compact_and_detail(mcp_session) -> None:
@@ -184,4 +184,4 @@ async def test_schema_tool_compact_and_detail(mcp_session) -> None:
         assert all(r["table_name"] == "cars" and "data_type" in r for r in detail)
 
         unknown = await session.call_tool("get_database_schema", {"table": "not_a_table"})
-        assert unknown.isError
+        assert unknown.is_error

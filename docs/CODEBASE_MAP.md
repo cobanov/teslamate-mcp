@@ -12,8 +12,9 @@ total_tokens: 19934
 [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to AI assistants (Claude Desktop,
 Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search queries with
 typed optional parameters + `run_sql` + `get_database_schema`; +1 opt-in write tool `set_charging_cost`),
-**prompts**, and **2 resources**. Python 3.11+, built on the official `mcp[cli]` SDK (FastMCP) and `psycopg` 3
-async pool (one pool shared across all MCP sessions).
+**prompts**, and **2 resources**. Python 3.11+, built on the official `mcp[cli]` SDK **v2** (`MCPServer`, since
+0.6.0 — speaks both the stateless MCP **2026-07-28** revision and the legacy `initialize` handshake) and a
+`psycopg` 3 async pool owned by the once-per-process lifespan.
 
 ---
 
@@ -33,8 +34,8 @@ graph TB
     end
 
     subgraph Core["Server core (server.py)"]
-        FastMCP["FastMCP instance"]
-        Lifespan["lifespan:<br/>open pool + warm schema cache"]
+        MCPServer["MCPServer instance"]
+        Lifespan["lifespan (once per process):<br/>open pool + warm schema cache"]
         AppCtx["AppContext(pool, schema)"]
     end
 
@@ -57,11 +58,11 @@ graph TB
     Queries["queries/*.sql + *.toml<br/>(23 bundled pairs)"]
 
     IDE --> CLI
-    Remote --> Auth --> FastMCP
-    CLI --> FastMCP
+    Remote --> Auth --> MCPServer
+    CLI --> MCPServer
     Auth -.exempts.-> Health
-    FastMCP --> Lifespan --> AppCtx
-    FastMCP --> Pre & RunSQL & SchemaTool & Res & Prompts
+    MCPServer --> Lifespan --> AppCtx
+    MCPServer --> Pre & RunSQL & SchemaTool & Res & Prompts
     Queries -.discovered by.-> Pre
     Pre --> FetchAll
     SchemaTool --> FetchAll
@@ -88,7 +89,7 @@ teslamate-mcp/
 │   ├── __init__.py          # __version__ from installed distribution metadata
 │   ├── __main__.py          # `python -m teslamate_mcp` shim -> cli.main
 │   ├── cli.py               # click CLI + HTTP app wiring + /health  ← PROCESS ENTRY
-│   ├── server.py            # create_server(): FastMCP factory + lifespan
+│   ├── server.py            # create_server(): MCPServer factory + lifespan
 │   ├── config.py            # pydantic-settings Settings (env / .env)
 │   ├── db.py                # pool + fetch_all (trusted) / fetch_readonly (guarded)
 │   ├── auth.py              # BearerAuthMiddleware (timing-safe, guards /mcp)
@@ -124,27 +125,33 @@ teslamate-mcp/
 | Subcommand | What it does |
 |------------|--------------|
 | `stdio` | `create_server()` → `mcp.run(transport="stdio")` — local, no auth (process boundary). |
-| `http [--host --port --auth-token --json-response/--sse-response]` | Builds `mcp.streamable_http_app()`, appends `/health`, conditionally wraps `BearerAuthMiddleware`, serves via `uvicorn.run`. |
+| `http [--host --port --auth-token --json-response/--sse-response --stateless/--stateful]` | Builds `mcp.streamable_http_app(json_response=…, stateless_http=…, host=…)`, appends `/health`, conditionally wraps `BearerAuthMiddleware`, serves via `uvicorn.run`. |
 | `gen-token [--length 32]` | Prints `AUTH_TOKEN=<secrets.token_urlsafe(length)>`. `--length` is **byte** length. |
 | `list-tools` | Enumerates predefined tool names + source files (+ the 2 built-ins) **without booting the server** — used by CI smoke test. |
 
 **Gotchas**:
 - ⚠️ **If `AUTH_TOKEN` is unset, the HTTP endpoint runs fully unauthenticated** — only a warning is logged; the server does not refuse to start.
 - `--auth-token` also reads `envvar="AUTH_TOKEN"` directly (separate from pydantic-settings). The click option overwrites `settings.auth_token` after `load_settings()`, so it wins.
-- `--json-response` sets `mcp.settings.json_response` — must happen **before** `streamable_http_app()`, which lazily builds the session manager and reads the flag at construction time. (Was previously a nonexistent field set after app creation → startup crash; fixed post-0.3.1.)
+- `--json-response` and `--stateless` are `streamable_http_app()` kwargs under SDK v2 (0.6.0+); the session manager is built inside that call. `--stateless` only affects legacy-era clients — 2026-07-28-era requests are sessionless by design. The Docker image runs with both flags.
+- Passing `host=settings.host` into `streamable_http_app()` lets the SDK auto-enable DNS-rebinding protection for localhost binds; it stays off for `0.0.0.0` (correct behind the Cloudflare tunnel, which forwards a public Host header).
+- Pool shutdown is owned by the server lifespan (`finally: pool.close()`), not an ASGI shutdown hook.
 
 ### Server core — `server.py`
 
 **Purpose**: Shared bootstrap for both transports.
-**Key export**: `create_server(settings: Settings) -> FastMCP`; `AppContext` dataclass (`pool`, `schema`).
-**Pattern (0.5.1+)**: ONE `AppContext` (pool + schema cache) is created in `create_server` and **shared by every
-MCP session** — FastMCP runs the lifespan per *session*, so per-session pools leaked connections until Postgres
-ran out of slots. The lifespan opens the pool idempotently under a lock, loads the schema once, **never raises**
-(a failing init logs, tool calls surface the error per-call, the next session retries), and never closes the
-pool; `cli.py` closes it on ASGI shutdown. `AppContext` is reachable in every handler via
-`ctx.request_context.lifespan_context` and exposed as `mcp.teslamate_app_context` for shutdown hooks/tests.
+**Key export**: `create_server(settings: Settings) -> MCPServer`; `AppContext` dataclass (`pool`, `schema`).
+**Pattern (0.6.0+, SDK v2)**: ONE `AppContext` (pool + schema cache) is created in `create_server`; the lifespan
+runs **once per process** on HTTP/stdio and owns the pool (open on enter, `finally: close()` on exit). It
+**never raises** — a failing init logs, tool calls surface the error per-call, and `get_database_schema` lazily
+retries the schema load. The in-memory test transport re-enters the lifespan per client connection, so a closed
+pool is rebuilt on entry (psycopg pools cannot reopen). Historical context: pre-0.5.1, per-session pools leaked
+connections until Postgres ran out of slots — the shared-`AppContext` design fixed that and is now the natural
+shape under v2. `AppContext` is reachable in every handler via `ctx.request_context.lifespan_context` and
+exposed as `mcp.teslamate_app_context` for tests.
+**Cache hints**: `_CACHE_HINTS` advertises `ttl_ms=3_600_000, scope="private"` (MCP 2026-07-28 `CacheableResult`)
+on `server/discover` and all list/read endpoints — the registry is static per process, so clients may cache
+aggressively (better prompt-cache hits, less polling).
 **Registration order**: predefined tools → schema tool → custom SQL tool → resources → prompts.
-**Gotcha**: host/port/debug are baked into the FastMCP instance even for `stdio`, where they are unused.
 
 ### Config — `config.py`
 
@@ -195,13 +202,14 @@ Turns declarative **`<name>.sql` + `<name>.toml`** file pairs into MCP tools:
 2. `discover_predefined_tools()` globs `*.sql`, requires a sibling `.toml` (missing → `FileNotFoundError`) with
    `name` + `description` keys (missing → `ValueError`). **Fail-fast at startup**, not silent skip.
 3. `register_predefined_tools()` → `_register_one()` builds one `async def handler(ctx)` **per tool via a factory**
-   (avoids the late-binding closure bug), pulls the pool from lifespan context, logs via `ctx.info()`, calls
-   `fetch_all(pool, tool.sql)`. All share `ToolAnnotations(readOnlyHint=True, idempotentHint=True, ...)`.
+   (avoids the late-binding closure bug), pulls the pool from lifespan context, logs via stdlib `logging`
+   (`ctx.info()` is deprecated with the MCP Logging feature), calls `fetch_all(pool, tool.sql)`. All share
+   `ToolAnnotations(read_only_hint=True, idempotent_hint=True, ...)` (snake_case under SDK v2).
 
 Params: the `.toml` contract supports `[[params]]` tables (name/type/description/required/default/min/max/enum),
 validated at discovery with SQL-placeholder cross-checks and a stray-`%` lint. `_build_signature()` crafts a real
 `inspect.Signature` (ctx first, `Annotated[T, Field(...)]` annotations, defaults on the Parameter) and sets it as
-`handler.__signature__` — the single source of truth FastMCP introspects for the input schema. Values bind via
+`handler.__signature__` — the single source of truth the SDK introspects for the input schema. Values bind via
 psycopg `%(name)s` placeholders (dict params); the reserved `%(tz)s` placeholder auto-injects `REPORT_TIMEZONE`.
 
 **Historical gotcha (fixed in 0.4.0)**: predefined tools took no parameters (no per-car or
@@ -232,8 +240,9 @@ picked up only on restart.
 
 Two static MCP **resources** derived from the `PredefinedTool` list:
 - `teslamate://queries` — JSON index `{name, description, source}` per tool.
-- `teslamate://queries/{name}` — raw SQL text for a named query (URI-template routing; `ValueError` on unknown).
-**Why resources, not tools**: FastMCP resource handlers cannot receive a `Context`, so they're limited to static,
+- `teslamate://queries/{name}` — raw SQL text for a named query (URI-template routing; `ResourceNotFoundError`
+  on unknown, which the SDK maps to JSON-RPC `-32602`).
+**Why resources, not tools**: SDK resource handlers cannot receive a `Context`, so they're limited to static,
 pre-computed content (no live DB access).
 
 ### Prompts — `prompts.py`
@@ -306,14 +315,14 @@ dimension. `car_settings` joins 1:1 via `cars.settings_id`.
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
-    participant FastMCP
+    participant MCPServer
     participant Handler as Tool handler
     participant DB as db.py
     participant PG as PostgreSQL
 
     Note over Client,PG: Predefined tool (e.g. get_battery_health_summary)
-    Client->>FastMCP: call tool (Context injected)
-    FastMCP->>Handler: handler(ctx)
+    Client->>MCPServer: call tool (Context injected)
+    MCPServer->>Handler: handler(ctx)
     Handler->>Handler: pool = ctx...lifespan_context.pool
     Handler->>DB: fetch_all(pool, tool.sql)
     DB->>PG: execute static SQL
@@ -323,8 +332,8 @@ sequenceDiagram
     Handler-->>Client: result
 
     Note over Client,PG: run_sql (untrusted)
-    Client->>FastMCP: run_sql(query="SELECT ...")
-    FastMCP->>Handler: handler(ctx, query)
+    Client->>MCPServer: run_sql(query="SELECT ...")
+    MCPServer->>Handler: handler(ctx, query)
     Handler->>Handler: validate_sql(query)  [reject on fail]
     Handler->>Handler: enforce_limit(query, row_limit)
     Handler->>DB: fetch_readonly(pool, capped, timeout)
@@ -347,26 +356,29 @@ token is present.
 
 ## Build, Test & CI
 
-**Packaging** (`pyproject.toml`): `teslamate-mcp` v0.4.0, Python ≥3.11, **hatchling** build (src-layout;
+**Packaging** (`pyproject.toml`): `teslamate-mcp` v0.6.0, Python ≥3.11, **hatchling** build (src-layout;
 the `packages` include ships `queries/` — do NOT re-add a `force-include` for it: hatchling ≥1.19 rejects the
 duplicate at wheel-build time, which only surfaces in non-editable builds like Docker). Console script
 `teslamate-mcp = "teslamate_mcp.cli:main"`.
-Runtime deps: `mcp[cli]`, `psycopg[binary]`, `psycopg-pool`, `pydantic`, `pydantic-settings`, `click`, `uvicorn`,
-`starlette`. Dev: `ruff`, `pytest`, `pytest-asyncio`, `testcontainers[postgres]`. Ruff line-length 100.
+Runtime deps: `mcp[cli]>=2,<3` (SDK v2, protocol 2026-07-28 + legacy eras), `psycopg[binary]`, `psycopg-pool`,
+`pydantic`, `pydantic-settings`, `click`, `uvicorn`, `starlette` (≥1.x via the SDK). Dev: `ruff`, `pytest`,
+`pytest-asyncio`, `testcontainers[postgres]`. Ruff line-length 100.
 
 **Tests** (`tests/`): pytest + `pytest-asyncio` (`asyncio_mode="auto"`) + **testcontainers** spinning a real
-`postgres:16-alpine` (a session-scoped `conftest.py` seeds a `demo_cars` table). Docker-backed integration tests
-(`test_db.py`, `test_schema.py`) **skip** when Docker is absent. Pure unit tests cover `serialization`,
-`custom_sql` validators, and registry discovery. `test_registry.py` includes a regression test that `ctx` never
-leaks into any tool's `inputSchema` (the 0.3.1 fix) plus generated-schema assertions; `test_cli.py` covers the
-CLI incl. the `--json-response` regression; `tests/test_registry_params.py` covers the TOML `[[params]]`
-contract; `tests/test_tools_e2e.py` runs **every** bundled query against a seeded TeslaMate-shaped Postgres
-(param binding, timezone bucketing, schema tool). 75 tests total. **Still untested**: `auth.py`, `prompts.py`,
-`resources.py`.
+`postgres:16-alpine` (a session-scoped `conftest.py` seeds a `demo_cars` table). E2E tests connect via the SDK
+v2 in-memory `Client(mcp)` and read snake_case result attrs (`is_error`, `structured_content`, `input_schema`).
+Docker-backed integration tests (`test_db.py`, `test_schema.py`) **skip** when Docker is absent. Pure unit tests
+cover `serialization`, `custom_sql` validators, and registry discovery. `test_registry.py` includes a regression
+test that `ctx` never leaks into any tool's `input_schema` (the 0.3.1 fix) plus generated-schema assertions;
+`test_cli.py` covers the CLI incl. the `--json-response`/`--stateless` session-manager wiring;
+`tests/test_registry_params.py` covers the TOML `[[params]]` contract; `tests/test_tools_e2e.py` runs **every**
+bundled query against a seeded TeslaMate-shaped Postgres (param binding, timezone bucketing, schema tool,
+sequential-session pool hygiene). 82 tests total. **Still untested**: `auth.py`, `prompts.py`, `resources.py`.
 
 **Docker**: multi-stage — `uv sync --frozen --no-dev` in a builder, copied into a slim non-root (`mcp`, uid 1000)
-runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` runs `http --json-response`.
-`docker-compose.yml` maps `8888:8888` and passes `DATABASE_URL`/`AUTH_TOKEN`/`LOG_LEVEL`.
+runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` runs
+`http --json-response --stateless`. `docker-compose.yml` maps `8888:8888` and passes
+`DATABASE_URL`/`AUTH_TOKEN`/`LOG_LEVEL`.
 
 **CI/CD**:
 - `ci.yml` (push/PR to `main`): `lint` (ruff format --check + check) → `test` (matrix 3.11/3.12/3.13, `pytest -ra`)

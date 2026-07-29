@@ -6,15 +6,22 @@
 assistants over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search
 queries defined as `.sql`/`.toml` file pairs with typed optional params + `run_sql` for arbitrary read-only SQL +
 `get_database_schema`; +1 opt-in write tool `set_charging_cost` behind `ENABLE_CHARGING_WRITES`), **prompts**,
-and **2 resources**. Built on the official `mcp[cli]` SDK (FastMCP) with a single `psycopg` 3 async pool shared
-across all MCP sessions (per-session pools leaked connections — fixed in 0.5.1, don't regress this).
+and **2 resources**. Built on the official `mcp[cli]` SDK **v2** (`MCPServer`, since 0.6.0), which serves both
+protocol eras at once: the stateless **2026-07-28** revision and the legacy `initialize` handshake
+(2025-06-18-era clients like the Cloudflare MCP portal). One `psycopg` 3 async pool is owned by the lifespan,
+which runs **once per process** on HTTP/stdio (per-session pools leaked connections pre-0.5.1 — don't regress
+this; the in-memory test transport re-enters the lifespan per client, so it rebuilds a closed pool on entry).
+List endpoints advertise a 1 h `ttl_ms` cache hint (`_CACHE_HINTS` in `server.py`) — the registry is static per
+process. Tool handlers log via stdlib `logging`, never `ctx.info()` (the MCP Logging feature is deprecated).
 
-**Stack**: Python 3.11+, FastMCP (`mcp[cli]`), psycopg 3 + psycopg-pool, pydantic-settings, click, Starlette/uvicorn.
-Hatchling build, ruff, pytest + testcontainers. Ships as a console script and a multi-arch Docker image on GHCR.
+**Stack**: Python 3.11+, `mcp[cli]>=2,<3` (`MCPServer`), psycopg 3 + psycopg-pool, pydantic-settings, click,
+Starlette/uvicorn. Hatchling build, ruff, pytest + testcontainers. Ships as a console script and a multi-arch
+Docker image on GHCR; the container runs `http --json-response --stateless`.
 
-**Structure**: `src/teslamate_mcp/` is a src-layout package — `cli.py` (entry), `server.py` (FastMCP factory +
+**Structure**: `src/teslamate_mcp/` is a src-layout package — `cli.py` (entry), `server.py` (MCPServer factory +
 lifespan), `db.py` (pool + two trust-level query paths), `tools/` (registry, `run_sql`, schema tool), and
-`queries/` (23 bundled `.sql`+`.toml` report pairs). Tests use real Postgres via testcontainers.
+`queries/` (23 bundled `.sql`+`.toml` report pairs). Tests use real Postgres via testcontainers and connect with
+the SDK's in-memory `Client` (v2 snake_case result attrs: `is_error`, `structured_content`, `input_schema`).
 
 **Key architectural principle — trust levels**: bundled `.sql` files are trusted and run via the unguarded
 `db.fetch_all()`; arbitrary LLM SQL (`run_sql`) runs via `db.fetch_readonly()`, whose Postgres `READ ONLY` +

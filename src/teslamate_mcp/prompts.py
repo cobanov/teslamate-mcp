@@ -8,10 +8,10 @@ a single-click entry point in MCP-aware UIs.
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 
-def register_prompts(mcp: FastMCP) -> None:
+def register_prompts(mcp: MCPServer) -> None:
     """Attach the prompt catalog to the server."""
 
     @mcp.prompt(

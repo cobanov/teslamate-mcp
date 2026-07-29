@@ -98,8 +98,11 @@ Option B — manual (**Docker → Add Container**):
 > Releases are published by pushing a `v*` tag (`git tag v0.x.y && git push origin v0.x.y`).
 
 > The image's default command already runs the HTTP transport
-> (`teslamate-mcp http --host 0.0.0.0 --port 8888 --json-response`), runs as a non-root
-> user, and has a built-in Docker `HEALTHCHECK` on `/health`. Leave **Post Arguments** empty.
+> (`teslamate-mcp http --host 0.0.0.0 --port 8888 --json-response --stateless`, as of 0.6.0),
+> runs as a non-root user, and has a built-in Docker `HEALTHCHECK` on `/health`. Leave
+> **Post Arguments** empty. `--stateless` (new in 0.6.0, SDK v2 / MCP 2026-07-28) serves
+> legacy-era clients like the portal without per-session server state; drop the flag with
+> **Post Arguments** if a client ever misbehaves without sessions.
 
 > **Historical (only if running the upstream `cobanov/…:0.3.1` image):** that image's
 > `--json-response` flag crashes at startup. Workaround: set **Post Arguments** to
@@ -115,7 +118,7 @@ Option B — manual (**Docker → Add Container**):
 
 ```bash
 curl http://192.168.1.100:8888/health
-# → {"status":"ok","version":"0.5.1"}   (or newer)
+# → {"status":"ok","version":"0.6.0"}   (or newer)
 
 curl -i http://192.168.1.100:8888/mcp
 # → HTTP 401 (bearer auth active)
@@ -175,6 +178,11 @@ curl -s -X POST https://teslamate-mcp.your-domain.com/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
 # → MCP initialize result (serverInfo "teslamate")
 ```
+
+> Since 0.6.0 the server runs SDK v2 and speaks both protocol eras: the legacy
+> `initialize` handshake above (what the Cloudflare portal uses) and the stateless
+> MCP **2026-07-28** revision (`server/discover`, no sessions). The 2025-06-18 curl
+> stays valid as the portal-path check.
 
 ---
 
