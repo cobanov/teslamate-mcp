@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Charging curve</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --series-soc: #2a78d6;
+    --series-power: #eb6834;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --series-soc: #3987e5;
+      --series-power: #d95926;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --series-soc: #3987e5;
+    --series-power: #d95926;
+    --border: rgba(255,255,255,0.10);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 14px 14px 10px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
+  .stat .v { font-size: 15px; font-weight: 600; }
+  .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .chart-wrap { position: relative; margin-top: 6px; }
+  svg { display: block; width: 100%; }
+  svg:focus { outline: 1.5px solid var(--series-soc); outline-offset: 2px; border-radius: 2px; }
+  .panel-title { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+  .tick-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .base-line { stroke: var(--baseline); stroke-width: 1; }
+  .series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
+  .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .tooltip {
+    position: absolute; top: 0; left: 0; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 7px 10px; font-size: 12px;
+    min-width: 130px; z-index: 2;
+  }
+  .tooltip .t { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .tooltip .row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .tooltip .key { width: 10px; height: 0; border-top: 2px solid; flex: none; }
+  .tooltip .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .lab { color: var(--text-secondary); font-size: 11px; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Charging curve</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div class="stats" id="stats" hidden></div>
+  <div class="chart-wrap" id="chartWrap" hidden>
+    <svg id="chart" role="img" tabindex="0" aria-label="Charging curve chart. Use arrow keys to inspect points."></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="state" id="state">Waiting for the charging data…</div>
+  <details id="tableWrap" hidden>
+    <summary>Data table</summary>
+    <div id="tableBox" style="overflow-x:auto"></div>
+  </details>
+</div>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+let hostTimeZone = null;
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+});
+
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  capabilities: {},
+  clientInfo: { name: "teslamate-charging-curve", version: "1.0.0" },
+  appCapabilities: { availableDisplayModes: ["inline"] },
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  if (hc.timeZone) hostTimeZone = hc.timeZone;
+  notify("ui/notifications/initialized");
+  render();
+}).catch(() => { /* keep default theme; data may still arrive */ });
+
+/* ---------- data handling ---------- */
+let rows = [];
+let sessionId = null;
+let hoverIndex = -1;
+
+function onToolInput(args) {
+  if (args && args.charging_process_id != null) {
+    sessionId = args.charging_process_id;
+    setText("title", "Charging curve · session #" + sessionId);
+  }
+}
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the charging curve. " + text);
+    return;
+  }
+  const sc = result.structuredContent;
+  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  if (!rows.length) {
+    showState("No charge points recorded for this session.");
+    return;
+  }
+  buildModel();
+  document.getElementById("state").hidden = true;
+  document.getElementById("stats").hidden = false;
+  document.getElementById("chartWrap").hidden = false;
+  document.getElementById("tableWrap").hidden = false;
+  renderStats();
+  renderTable();
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+
+/* ---------- model ---------- */
+let points = []; // {t: Date, soc: number, power: number|null}
+
+function parseUtc(s) {
+  if (typeof s !== "string") return null;
+  const iso = /(Z|[+-]\d\d:?\d\d)$/.test(s) ? s : s + "Z"; // TeslaMate stores naive UTC
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function buildModel() {
+  points = rows.map((r) => ({
+    t: parseUtc(r.bucket_start),
+    soc: r.battery_level_start,
+    power: r.avg_power_kw,
+  })).filter((p) => p.t && p.soc != null);
+}
+
+const timeFmt = () => new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit", minute: "2-digit", ...(hostTimeZone ? { timeZone: hostTimeZone } : {}),
+});
+function fmtTime(d) { return timeFmt().format(d); }
+function fmtDur(ms) {
+  const m = Math.round(ms / 60000);
+  return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min";
+}
+
+function renderStats() {
+  const socStart = rows[0].battery_level_start;
+  const socEnd = rows[rows.length - 1].battery_level_end;
+  const peak = Math.max(...rows.map((r) => r.max_power_kw || 0));
+  const dur = points[points.length - 1].t - points[0].t;
+  const temps = rows.map((r) => r.avg_outside_temp).filter((v) => v != null);
+  const avgTemp = temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
+  const stats = [
+    [socStart + "% → " + socEnd + "%", "Battery level"],
+    [peak + " kW", "Peak power"],
+    [fmtDur(dur), "Duration"],
+  ];
+  if (avgTemp != null) stats.push([avgTemp.toFixed(1) + " °C", "Avg outside temp"]);
+  const box = document.getElementById("stats");
+  box.replaceChildren(...stats.map(([v, l]) => {
+    const d = document.createElement("div");
+    d.className = "stat";
+    const dv = document.createElement("div"); dv.className = "v"; dv.textContent = v;
+    const dl = document.createElement("div"); dl.className = "l"; dl.textContent = l;
+    d.append(dv, dl);
+    return d;
+  }));
+  setText("subtitle", fmtTime(points[0].t) + " – " + fmtTime(points[points.length - 1].t)
+    + " · " + points.length + " points");
+}
+
+function renderTable() {
+  const cols = [
+    ["bucket_start", "Time"], ["battery_level_start", "Battery %"],
+    ["avg_power_kw", "Avg kW"], ["max_power_kw", "Max kW"],
+    ["avg_voltage", "Volts"], ["avg_outside_temp", "°C"],
+  ];
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.append(...cols.map(([, label]) => {
+    const th = document.createElement("th"); th.textContent = label; return th;
+  }));
+  thead.append(hr);
+  const tbody = document.createElement("tbody");
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.append(...cols.map(([key]) => {
+      const td = document.createElement("td");
+      const v = r[key];
+      td.textContent = key === "bucket_start" ? fmtTime(parseUtc(v)) : (v == null ? "–" : String(v));
+      return td;
+    }));
+    tbody.append(tr);
+  });
+  table.append(thead, tbody);
+  document.getElementById("tableBox").replaceChildren(table);
+}
+
+/* ---------- chart ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const M = { left: 42, right: 14, top: 18, panelGap: 26, xAxis: 22 };
+const PANEL_H = { soc: 130, power: 96 };
+let geom = null;
+
+function el(name, attrs) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+function niceTicks(min, max, count) {
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  const step0 = span / Math.max(1, count);
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
+  const lo = Math.floor(min / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= max + 1e-9; v += step) if (v >= min - 1e-9) ticks.push(+v.toFixed(6));
+  return ticks;
+}
+
+function render() {
+  if (!points.length) { reportSize(); return; }
+  const svg = document.getElementById("chart");
+  const width = Math.max(280, svg.parentElement.clientWidth || 280);
+  const height = M.top + PANEL_H.soc + M.panelGap + PANEL_H.power + M.xAxis;
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("height", height);
+  svg.replaceChildren();
+
+  const t0 = points[0].t.getTime(), t1 = points[points.length - 1].t.getTime();
+  const plotW = width - M.left - M.right;
+  const x = (t) => M.left + (t1 === t0 ? plotW / 2 : ((t - t0) / (t1 - t0)) * plotW);
+
+  const socVals = points.map((p) => p.soc);
+  const powerVals = points.map((p) => p.power).filter((v) => v != null);
+  const socDomain = [Math.max(0, Math.min(...socVals) - 3), Math.min(100, Math.max(...socVals) + 3)];
+  const powerDomain = [0, Math.max(1, Math.max(...powerVals, 0) * 1.08)];
+
+  const panels = [
+    { key: "soc", label: "Battery level (%)", top: M.top, h: PANEL_H.soc,
+      domain: socDomain, color: "var(--series-soc)", get: (p) => p.soc },
+    { key: "power", label: "Charging power (kW)", top: M.top + PANEL_H.soc + M.panelGap,
+      h: PANEL_H.power, domain: powerDomain, color: "var(--series-power)", get: (p) => p.power },
+  ];
+  geom = { x, panels, width, height };
+
+  for (const panel of panels) {
+    const y = (v) => panel.top + panel.h -
+      ((v - panel.domain[0]) / (panel.domain[1] - panel.domain[0])) * panel.h;
+    panel.y = y;
+    const title = el("text", { x: M.left, y: panel.top - 6, class: "panel-title" });
+    title.textContent = panel.label;
+    svg.append(title);
+    for (const tv of niceTicks(panel.domain[0], panel.domain[1], 4)) {
+      if (Math.abs(y(tv) - (panel.top + panel.h)) > 4) { // baseline stands in for a bottom tick
+        svg.append(el("line", { x1: M.left, x2: width - M.right, y1: y(tv), y2: y(tv), class: "grid-line" }));
+      }
+      const lab = el("text", { x: M.left - 6, y: y(tv) + 3, "text-anchor": "end", class: "tick-label" });
+      lab.textContent = String(tv);
+      svg.append(lab);
+    }
+    svg.append(el("line", {
+      x1: M.left, x2: width - M.right, y1: panel.top + panel.h, y2: panel.top + panel.h, class: "base-line",
+    }));
+    const d = points
+      .filter((p) => panel.get(p) != null)
+      .map((p, i) => (i ? "L" : "M") + x(p.t.getTime()).toFixed(1) + " " + y(panel.get(p)).toFixed(1))
+      .join(" ");
+    svg.append(el("path", { d, class: "series-line", stroke: panel.color }));
+  }
+
+  const bottomPanel = panels[1];
+  for (const tickMs of niceTimeTicks(t0, t1)) {
+    const lab = el("text", {
+      x: x(tickMs), y: bottomPanel.top + bottomPanel.h + 15, "text-anchor": "middle", class: "tick-label",
+    });
+    lab.textContent = fmtTime(new Date(tickMs));
+    svg.append(lab);
+  }
+
+  const hover = el("g", { id: "hoverLayer", style: "display:none" });
+  hover.append(el("line", { id: "crosshair", y1: M.top, y2: bottomPanel.top + bottomPanel.h, class: "crosshair" }));
+  for (const panel of panels) {
+    hover.append(el("circle", { id: "dot-" + panel.key, r: 4, fill: panel.color, class: "hover-dot" }));
+  }
+  svg.append(hover);
+  bindPointer(svg);
+  if (hoverIndex >= 0) showHover(hoverIndex);
+  reportSize();
+}
+
+function niceTimeTicks(t0, t1) {
+  const span = t1 - t0;
+  const steps = [60, 120, 300, 600, 900, 1800, 3600, 7200, 14400].map((s) => s * 1000);
+  const step = steps.find((s) => span / s <= 6) || steps[steps.length - 1];
+  const ticks = [];
+  for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) ticks.push(t);
+  return ticks.length ? ticks : [t0, t1];
+}
+
+function bindPointer(svg) {
+  svg.onpointermove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * geom.width;
+    let best = 0, bestDist = Infinity;
+    points.forEach((p, i) => {
+      const d = Math.abs(geom.x(p.t.getTime()) - px);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    showHover(best);
+  };
+  svg.onpointerleave = () => hideHover();
+  svg.onkeydown = (ev) => {
+    const last = points.length - 1;
+    let i = hoverIndex < 0 ? 0 : hoverIndex;
+    if (ev.key === "ArrowRight") i = Math.min(last, i + 1);
+    else if (ev.key === "ArrowLeft") i = Math.max(0, i - 1);
+    else if (ev.key === "Home") i = 0;
+    else if (ev.key === "End") i = last;
+    else if (ev.key === "Escape") { hideHover(); return; }
+    else return;
+    ev.preventDefault();
+    showHover(i);
+  };
+}
+
+function showHover(i) {
+  hoverIndex = i;
+  const p = points[i];
+  const cx = geom.x(p.t.getTime());
+  const layer = document.getElementById("hoverLayer");
+  layer.style.display = "";
+  const cross = document.getElementById("crosshair");
+  cross.setAttribute("x1", cx); cross.setAttribute("x2", cx);
+  for (const panel of geom.panels) {
+    const dot = document.getElementById("dot-" + panel.key);
+    const v = panel.get(p);
+    if (v == null) { dot.style.display = "none"; continue; }
+    dot.style.display = "";
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", panel.y(v));
+  }
+  const tip = document.getElementById("tooltip");
+  tip.replaceChildren();
+  const t = document.createElement("div"); t.className = "t"; t.textContent = fmtTime(p.t);
+  tip.append(t);
+  const rowsData = [
+    [p.soc != null ? p.soc + "%" : "–", "Battery", "var(--series-soc)"],
+    [p.power != null ? p.power + " kW" : "–", "Power", "var(--series-power)"],
+  ];
+  for (const [val, lab, color] of rowsData) {
+    const row = document.createElement("div"); row.className = "row";
+    const key = document.createElement("span"); key.className = "key"; key.style.borderTopColor = color;
+    const v = document.createElement("span"); v.className = "val"; v.textContent = val;
+    const l = document.createElement("span"); l.className = "lab"; l.textContent = lab;
+    row.append(key, v, l);
+    tip.append(row);
+  }
+  tip.style.display = "block";
+  const wrap = document.getElementById("chartWrap");
+  const svgEl = document.getElementById("chart");
+  const scale = svgEl.getBoundingClientRect().width / geom.width;
+  const pxLeft = cx * scale;
+  const flip = pxLeft > wrap.clientWidth - tip.offsetWidth - 20;
+  tip.style.left = (flip ? pxLeft - tip.offsetWidth - 10 : pxLeft + 10) + "px";
+  tip.style.top = "24px";
+}
+function hideHover() {
+  hoverIndex = -1;
+  document.getElementById("hoverLayer").style.display = "none";
+  document.getElementById("tooltip").style.display = "none";
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+new ResizeObserver(() => { if (points.length) render(); else reportSize(); })
+  .observe(document.getElementById("root"));
+document.getElementById("tableWrap").addEventListener("toggle", reportSize);
+</script>
+</body>
+</html>

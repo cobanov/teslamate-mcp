@@ -25,6 +25,7 @@ from .tools import (
     register_predefined_tools,
     register_schema_tool,
 )
+from .tools.apps_ui import build_apps_extension
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +82,20 @@ def create_server(settings: Settings) -> MCPServer:
         finally:
             await app_context.pool.close()
 
+    tools = discover_predefined_tools()
+
     mcp = MCPServer(
         "teslamate",
         version=__version__,
         lifespan=lifespan,
         debug=settings.debug,
         cache_hints=_CACHE_HINTS,
+        # MCP Apps (io.modelcontextprotocol/ui): show_charging_curve + its
+        # ui:// chart resource. Degrades to a plain data tool on clients
+        # that did not negotiate the extension.
+        extensions=[build_apps_extension(tools)],
     )
 
-    tools = discover_predefined_tools()
     register_predefined_tools(mcp, tools, report_timezone=settings.report_timezone)
     register_schema_tool(mcp)
     register_custom_sql(
@@ -102,7 +108,8 @@ def create_server(settings: Settings) -> MCPServer:
     register_resources(mcp, tools)
     register_prompts(mcp)
     logger.info(
-        "Registered %d predefined tools + run_sql + get_database_schema%s + 2 resources + prompts",
+        "Registered %d predefined tools + run_sql + get_database_schema + "
+        "show_charging_curve (MCP Apps)%s + resources + prompts",
         len(tools),
         " + set_charging_cost (writes ENABLED)" if settings.enable_charging_writes else "",
     )

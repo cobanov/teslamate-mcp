@@ -3,10 +3,12 @@
 ## Codebase Overview
 
 **teslamate-mcp** is a Model Context Protocol (MCP) server that exposes a TeslaMate PostgreSQL database to AI
-assistants over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search
+assistants over **stdio** and **streamable HTTP**. It surfaces **26 tools** (23 predefined analytics/search
 queries defined as `.sql`/`.toml` file pairs with typed optional params + `run_sql` for arbitrary read-only SQL +
-`get_database_schema`; +1 opt-in write tool `set_charging_cost` behind `ENABLE_CHARGING_WRITES`), **prompts**,
-and **2 resources**. Built on the official `mcp[cli]` SDK **v2** (`MCPServer`, since 0.6.0), which serves both
+`get_database_schema` + `show_charging_curve`, an **MCP Apps** tool that renders an interactive chart
+in-conversation and degrades to plain rows on non-Apps clients; +1 opt-in write tool `set_charging_cost` behind
+`ENABLE_CHARGING_WRITES`), **prompts**, and **3 resources** (query index, per-query SQL, the `ui://` chart app in
+`src/teslamate_mcp/apps/`, wired by `tools/apps_ui.py` via `MCPServer(extensions=[Apps()])`). Built on the official `mcp[cli]` SDK **v2** (`MCPServer`, since 0.6.0), which serves both
 protocol eras at once: the stateless **2026-07-28** revision and the legacy `initialize` handshake
 (2025-06-18-era clients like the Cloudflare MCP portal). One `psycopg` 3 async pool is owned by the lifespan,
 which runs **once per process** on HTTP/stdio (per-session pools leaked connections pre-0.5.1 — don't regress

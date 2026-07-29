@@ -150,6 +150,7 @@ def list_tools_cmd() -> None:
         click.echo(f"{tool.name:<45} {tool.source}  ({params})")
     click.echo(f"{'get_database_schema':<45} (built-in)  (table)")
     click.echo(f"{'run_sql':<45} (built-in)  (query)")
+    click.echo(f"{'show_charging_curve':<45} (MCP App)   (charging_process_id, max_points)")
 
 
 if __name__ == "__main__":  # pragma: no cover

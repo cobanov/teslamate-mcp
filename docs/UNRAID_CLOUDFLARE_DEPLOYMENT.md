@@ -201,9 +201,16 @@ curl -s -X POST https://teslamate-mcp.your-domain.com/mcp \
 
 teslamate-mcp does not implement OAuth/dynamic client registration, so **Custom Headers**
 is the correct (and documented) auth method for it. Save — Cloudflare connects, syncs
-capabilities, and the server status becomes **Ready** (25 tools as of 0.4.0, 6 prompts, 2 resources).
+capabilities, and the server status becomes **Ready** (27 tools with writes enabled as of
+0.7.0 — incl. the `show_charging_curve` MCP Apps chart — 7 prompts, 3 resources).
 After deploying a new server version with added/changed tools, force **⋯ → Sync capabilities**
 on the MCP server entry (auto-resync is ~2h).
+
+> **MCP Apps note (0.7.0+)**: `show_charging_curve` carries a `ui://` chart the client can
+> render in-conversation (extension `io.modelcontextprotocol/ui`). Whether the interactive
+> chart appears depends on the client and on the portal passing the extension through; on
+> clients without Apps support the tool degrades to plain data rows, identical to
+> `get_charging_curve`.
 
 ### 3.2 Create the portal
 

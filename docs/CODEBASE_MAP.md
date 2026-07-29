@@ -102,7 +102,9 @@ teslamate-mcp/
 │   │   ├── registry.py      # .sql+.toml -> MCP tool discovery & registration
 │   │   ├── custom_sql.py    # run_sql tool: validate_sql + enforce_limit
 │   │   ├── charging_write.py# opt-in set_charging_cost + receipts prompt (0.5.0+)
+│   │   ├── apps_ui.py       # MCP Apps ext: show_charging_curve + ui:// chart (0.7.0+)
 │   │   └── schema_tool.py   # get_database_schema tool
+│   ├── apps/                # self-contained HTML apps (charging_curve.html)
 │   └── queries/             # 23 × (<name>.sql + <name>.toml) bundled report pairs
 ├── tests/                   # pytest + pytest-asyncio + testcontainers[postgres]
 ├── pyproject.toml           # hatchling build, deps, ruff/pytest config, console script
@@ -244,6 +246,18 @@ Two static MCP **resources** derived from the `PredefinedTool` list:
   on unknown, which the SDK maps to JSON-RPC `-32602`).
 **Why resources, not tools**: SDK resource handlers cannot receive a `Context`, so they're limited to static,
 pre-computed content (no live DB access).
+
+### MCP Apps — `tools/apps_ui.py` + `apps/charging_curve.html` (0.7.0+)
+
+`build_apps_extension(tools)` returns an SDK `Apps` extension (`io.modelcontextprotocol/ui`, ext-apps spec
+2026-01-26) passed to `MCPServer(extensions=[...])`. It registers `show_charging_curve` — same SQL as
+`get_charging_curve` (reused from the discovered registry, fail-fast if missing) with `_meta.ui.resourceUri`
+pointing at `ui://teslamate/charging-curve.html` — and that resource: a fully self-contained HTML app
+(`text/html;profile=mcp-app`, no external fetches) that speaks the postMessage handshake (`ui/initialize` →
+`ui/notifications/initialized` → renders on `ui/notifications/tool-result`), draws two stacked SVG panels
+(battery %, charging power) with a shared crosshair/tooltip/data-table, follows host theme, and reports
+`ui/notifications/size-changed`. **Degrades gracefully**: non-Apps clients get the rows as plain structured
+content.
 
 ### Prompts — `prompts.py`
 
