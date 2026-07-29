@@ -17,3 +17,19 @@ name = "limit"
 type = "integer"
 description = "Maximum number of rows returned."
 minimum = 1
+
+[[output]]
+name = "drive_day"
+type = "string"
+
+[[output]]
+name = "drive_count"
+type = "integer"
+
+[[output]]
+name = "total_km"
+type = "number"
+
+[[output]]
+name = "total_minutes"
+type = "integer"

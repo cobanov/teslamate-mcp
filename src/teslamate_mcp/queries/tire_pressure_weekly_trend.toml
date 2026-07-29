@@ -12,3 +12,35 @@ type = "integer"
 description = "Window in days. The default preserves the tool's original window."
 default = 90
 minimum = 7
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "week"
+type = "string"
+
+[[output]]
+name = "avg_front_left"
+type = "number"
+
+[[output]]
+name = "avg_front_right"
+type = "number"
+
+[[output]]
+name = "avg_rear_left"
+type = "number"
+
+[[output]]
+name = "avg_rear_right"
+type = "number"
+
+[[output]]
+name = "weekly_avg_pressure"
+type = "number"
+
+[[output]]
+name = "readings_count"
+type = "integer"

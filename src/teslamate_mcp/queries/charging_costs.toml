@@ -22,3 +22,23 @@ description = "Earliest local calendar date to include, ISO format (YYYY-MM-DD).
 name = "end_date"
 type = "string"
 description = "Latest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[output]]
+name = "group_key"
+type = "string"
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "total_energy_kwh"
+type = "number"
+
+[[output]]
+name = "total_cost"
+type = "number"
+
+[[output]]
+name = "avg_cost_per_kwh"
+type = "number"

@@ -16,6 +16,7 @@ from . import __version__
 from .auth import BearerAuthMiddleware
 from .config import load_settings
 from .server import create_server
+from .telemetry import configure_telemetry
 from .tools import discover_predefined_tools
 
 
@@ -63,6 +64,7 @@ def stdio() -> None:
     """Run the MCP server over stdio (for local clients like Cursor or Claude Desktop)."""
     settings = load_settings()
     _configure_logging(settings.log_level)
+    configure_telemetry()
     mcp = create_server(settings)
     mcp.run(transport="stdio")
 
@@ -107,6 +109,7 @@ def http(
         settings.auth_token = SecretStr(auth_token)
 
     _configure_logging(settings.log_level)
+    configure_telemetry()
     mcp = create_server(settings)
 
     # MCPServer exposes a Starlette app for streamable-http; we wrap it for

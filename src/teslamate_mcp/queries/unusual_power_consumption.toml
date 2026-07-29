@@ -27,3 +27,35 @@ description = "Maximum number of rows returned."
 default = 10
 minimum = 1
 maximum = 100
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "distance"
+type = "number"
+
+[[output]]
+name = "range_used"
+type = "number"
+
+[[output]]
+name = "consumption_pct"
+type = "number"
+
+[[output]]
+name = "outside_temp_avg"
+type = "number"
+
+[[output]]
+name = "start_location"
+type = "string"
+
+[[output]]
+name = "end_location"
+type = "string"

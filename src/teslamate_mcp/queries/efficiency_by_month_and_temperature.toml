@@ -12,3 +12,27 @@ type = "integer"
 description = "Window in days. The default preserves the tool's original window."
 default = 365
 minimum = 28
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "month"
+type = "string"
+
+[[output]]
+name = "avg_temp"
+type = "number"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "drive_count"
+type = "integer"
+
+[[output]]
+name = "avg_distance_per_drive"
+type = "number"

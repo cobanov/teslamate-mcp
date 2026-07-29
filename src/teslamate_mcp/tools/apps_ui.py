@@ -13,17 +13,44 @@ import logging
 from importlib.resources import files
 from typing import Any
 
-from mcp.server.apps import Apps
+from mcp import types
+from mcp.server.apps import APP_MIME_TYPE, Apps
 from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from ..db import fetch_all
-from .registry import PredefinedTool
+from .registry import PredefinedTool, build_row_model
 
 logger = logging.getLogger(__name__)
 
 CHARGING_CURVE_APP_URI = "ui://teslamate/charging-curve.html"
+
+
+class ResourceLinkedApps(Apps):
+    """Apps variant that also embeds a resource_link block in tool results.
+
+    The ext-apps spec binds a tool to its UI via tool `_meta.ui` only, but
+    Claude's connector implementation documents the interactive pattern as the
+    result carrying "structuredContent and a resource link". Prepending the
+    link is spec-harmless (non-UI clients ignore the extra block) and gives
+    renderers that key off the result a second signal.
+    """
+
+    async def intercept_tool_call(self, params, ctx, call_next):  # type: ignore[override]
+        result = await call_next(ctx)
+        uri = next((u for b, u in self._tools if b.kwargs.get("name") == params.name), None)
+        if uri is not None and isinstance(result, types.CallToolResult):
+            result.content.insert(
+                0,
+                types.ResourceLink(
+                    type="resource_link",
+                    uri=uri,
+                    name=uri.rsplit("/", 1)[-1],
+                    mime_type=APP_MIME_TYPE,
+                ),
+            )
+        return result
 
 
 def _load_app_html(filename: str) -> str:
@@ -44,7 +71,7 @@ def build_apps_extension(tools: list[PredefinedTool]) -> Apps:
             "charging_curve.sql/.toml must exist in queries/"
         ) from None
 
-    apps = Apps()
+    apps = ResourceLinkedApps()
 
     annotations = ToolAnnotations(
         read_only_hint=True,
@@ -96,6 +123,11 @@ def build_apps_extension(tools: list[PredefinedTool]) -> Apps:
         return rows
 
     show_charging_curve.__annotations__["ctx"] = Context
+    # Share the curve tool's [[output]] declaration so both tools advertise
+    # the same typed outputSchema.
+    row_model = build_row_model(curve)
+    if row_model is not None:
+        show_charging_curve.__annotations__["return"] = list[row_model]
     apps.add_html_resource(
         CHARGING_CURVE_APP_URI,
         _load_app_html("charging_curve.html"),

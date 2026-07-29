@@ -5,3 +5,31 @@ description = "Basic information for each car: name, model, trim badging, exteri
 name = "car_name"
 type = "string"
 description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "name"
+type = "string"
+
+[[output]]
+name = "model"
+type = "string"
+
+[[output]]
+name = "trim_badging"
+type = "string"
+
+[[output]]
+name = "exterior_color"
+type = "string"
+
+[[output]]
+name = "marketing_name"
+type = "string"
+
+[[output]]
+name = "enabled"
+type = "boolean"
+
+[[output]]
+name = "free_supercharging"
+type = "boolean"

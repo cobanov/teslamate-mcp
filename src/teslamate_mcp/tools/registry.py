@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ..db import fetch_all
 
@@ -36,6 +36,7 @@ _RESERVED_PARAM_NAMES = frozenset({"ctx", "tz"})
 _ALLOWED_PARAM_KEYS = frozenset(
     {"name", "type", "description", "required", "default", "minimum", "maximum", "enum"}
 )
+_ALLOWED_OUTPUT_KEYS = frozenset({"name", "type", "description"})
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,20 @@ class ToolParam:
 
 
 @dataclass(frozen=True)
+class ToolOutputColumn:
+    """One result column declared in a .toml [[output]] table.
+
+    Advisory typing: every column is nullable and undeclared columns still
+    pass through, so a declaration drifting behind the SQL can never turn a
+    working query into a runtime error — it only under-documents it.
+    """
+
+    name: str
+    type: str
+    description: str | None = None
+
+
+@dataclass(frozen=True)
 class PredefinedTool:
     """A SQL query exposed as an MCP tool, declared via a .sql + .toml pair."""
 
@@ -62,6 +77,7 @@ class PredefinedTool:
     source: str  # filename, for diagnostics
     params: tuple[ToolParam, ...] = field(default=())
     uses_tz: bool = False
+    output: tuple[ToolOutputColumn, ...] = field(default=())
 
 
 def _queries_dir() -> Path:
@@ -157,6 +173,35 @@ def _parse_param(raw: Any, source: str) -> ToolParam:
     )
 
 
+def _parse_output_column(raw: Any, source: str) -> ToolOutputColumn:
+    """Validate one [[output]] table. All failures raise ValueError naming the file."""
+    if not isinstance(raw, dict):
+        raise ValueError(f"{source}: each [[output]] entry must be a table")
+    unknown = set(raw) - _ALLOWED_OUTPUT_KEYS
+    if unknown:
+        raise ValueError(f"{source}: unknown output key(s) {sorted(unknown)!r}")
+    for key in ("name", "type"):
+        if key not in raw:
+            raise ValueError(f"{source}: output column is missing required key {key!r}")
+
+    name = raw["name"]
+    if not isinstance(name, str) or not _PARAM_NAME_RE.match(name):
+        raise ValueError(f"{source}: invalid output column name {name!r}")
+
+    col_type = raw["type"]
+    if col_type not in _PARAM_TYPES:
+        raise ValueError(
+            f"{source}: output column {name!r} has unknown type {col_type!r} "
+            f"(want one of {sorted(_PARAM_TYPES)})"
+        )
+
+    description = raw.get("description")
+    if description is not None and (not isinstance(description, str) or not description.strip()):
+        raise ValueError(f"{source}: output column {name!r} description must be a non-empty string")
+
+    return ToolOutputColumn(name=name, type=col_type, description=description)
+
+
 def _validate_sql_placeholders(sql: str, params: tuple[ToolParam, ...], source: str) -> bool:
     """Cross-check SQL `%(name)s` placeholders against declared params.
 
@@ -217,6 +262,16 @@ def discover_predefined_tools(directory: Path | None = None) -> list[PredefinedT
                 raise ValueError(f"{toml_path.name}: duplicate param name {p.name!r}")
             seen.add(p.name)
 
+        raw_output = meta.get("output", [])
+        if not isinstance(raw_output, list):
+            raise ValueError(f"{toml_path.name}: 'output' must be an array of tables")
+        output = tuple(_parse_output_column(raw, toml_path.name) for raw in raw_output)
+        seen_cols: set[str] = set()
+        for col in output:
+            if col.name in seen_cols:
+                raise ValueError(f"{toml_path.name}: duplicate output column {col.name!r}")
+            seen_cols.add(col.name)
+
         sql = sql_path.read_text(encoding="utf-8")
         uses_tz = _validate_sql_placeholders(sql, params, toml_path.name)
 
@@ -228,9 +283,30 @@ def discover_predefined_tools(directory: Path | None = None) -> list[PredefinedT
                 source=sql_path.name,
                 params=params,
                 uses_tz=uses_tz,
+                output=output,
             )
         )
     return tools
+
+
+def build_row_model(tool: PredefinedTool) -> type[BaseModel] | None:
+    """Build a pydantic row model from [[output]] declarations, or None.
+
+    Used as the handler's `list[Model]` return annotation so the SDK derives a
+    typed outputSchema (per-column names/types) instead of an open object.
+    Every field is `T | None = None` and the model allows extras, so column
+    drift between the .toml and the SQL degrades documentation, never calls.
+    """
+    if not tool.output:
+        return None
+    fields: dict[str, Any] = {
+        col.name: (
+            _PARAM_TYPES[col.type] | None,
+            Field(default=None, description=col.description),
+        )
+        for col in tool.output
+    }
+    return create_model(f"{tool.name}_row", __config__=ConfigDict(extra="allow"), **fields)
 
 
 def _annotation_for(param: ToolParam) -> Any:
@@ -261,7 +337,9 @@ def _build_signature(tool: PredefinedTool) -> inspect.Signature:
                 annotation=_annotation_for(p),
             )
         )
-    return inspect.Signature(parameters, return_annotation=list[dict[str, Any]])
+    row_model = build_row_model(tool)
+    return_annotation = list[row_model] if row_model else list[dict[str, Any]]
+    return inspect.Signature(parameters, return_annotation=return_annotation)
 
 
 def register_predefined_tools(

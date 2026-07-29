@@ -104,3 +104,59 @@ async def test_parameterized_tool_schemas() -> None:
     schema_tool = tools["get_database_schema"].input_schema
     assert "table" in schema_tool["properties"]
     assert "table" not in schema_tool.get("required", [])
+
+
+def _row_properties(output_schema: dict) -> dict:
+    """Resolve the {result: [$ref]} wrapper to the row model's properties."""
+    items = output_schema["properties"]["result"]["items"]
+    if "$ref" in items:
+        name = items["$ref"].rsplit("/", 1)[-1]
+        return output_schema["$defs"][name]["properties"]
+    return items.get("properties", {})
+
+
+@pytest.mark.asyncio
+async def test_typed_output_schemas_from_toml() -> None:
+    settings = Settings(database_url=_DUMMY_DB_URL)  # type: ignore[call-arg]
+    mcp = create_server(settings)
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    # Every predefined tool declares [[output]] and gets per-column typing.
+    for t in discover_predefined_tools():
+        assert t.output, f"{t.source} has no [[output]] declaration"
+        props = _row_properties(tools[t.name].output_schema)
+        assert set(props) == {c.name for c in t.output}, t.name
+
+    details = _row_properties(tools["get_drive_details"].output_schema)
+    assert {"type": "integer"} in details["drive_id"]["anyOf"]  # nullable int
+    assert {"type": "string"} in details["car_name"]["anyOf"]
+    assert {"type": "number"} in details["distance_km"]["anyOf"]
+
+    # run_sql stays deliberately untyped (arbitrary SELECTs).
+    run_sql_items = tools["run_sql"].output_schema["properties"]["result"]["items"]
+    assert run_sql_items.get("additionalProperties") is True
+
+
+def test_output_contract_violations_raise(tmp_path: Path) -> None:
+    (tmp_path / "q.sql").write_text("SELECT 1 AS a", encoding="utf-8")
+    base = 'name = "x"\ndescription = "a perfectly valid description here"\n'
+
+    (tmp_path / "q.toml").write_text(
+        base + '[[output]]\nname = "a"\ntype = "decimal"\n', encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="unknown type"):
+        discover_predefined_tools(tmp_path)
+
+    (tmp_path / "q.toml").write_text(
+        base
+        + '[[output]]\nname = "a"\ntype = "integer"\n[[output]]\nname = "a"\ntype = "integer"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="duplicate output column"):
+        discover_predefined_tools(tmp_path)
+
+    (tmp_path / "q.toml").write_text(
+        base + '[[output]]\nname = "a"\ntype = "integer"\nextra = 1\n', encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="unknown output key"):
+        discover_predefined_tools(tmp_path)

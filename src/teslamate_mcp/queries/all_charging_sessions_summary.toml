@@ -11,3 +11,31 @@ name = "days"
 type = "integer"
 description = "Restrict to the last N days. Omit for all time."
 minimum = 1
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "total_charging_sessions"
+type = "integer"
+
+[[output]]
+name = "total_energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "avg_energy_per_session"
+type = "number"
+
+[[output]]
+name = "total_charging_time_min"
+type = "integer"
+
+[[output]]
+name = "avg_charging_time_min"
+type = "number"
+
+[[output]]
+name = "total_charging_cost"
+type = "number"

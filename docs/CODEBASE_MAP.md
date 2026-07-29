@@ -209,7 +209,10 @@ Turns declarative **`<name>.sql` + `<name>.toml`** file pairs into MCP tools:
    `ToolAnnotations(read_only_hint=True, idempotent_hint=True, ...)` (snake_case under SDK v2).
 
 Params: the `.toml` contract supports `[[params]]` tables (name/type/description/required/default/min/max/enum),
-validated at discovery with SQL-placeholder cross-checks and a stray-`%` lint. `_build_signature()` crafts a real
+validated at discovery with SQL-placeholder cross-checks and a stray-`%` lint. Since 0.8.0 it also supports
+`[[output]]` tables (name/type/optional description): `build_row_model()` turns them into a dynamic pydantic
+row model (`T | None = None` fields, `extra="allow"`) used as the handler's `list[Model]` return annotation, so
+the SDK derives a **typed per-column outputSchema** — advisory typing that tolerates SQL drift. `_build_signature()` crafts a real
 `inspect.Signature` (ctx first, `Annotated[T, Field(...)]` annotations, defaults on the Parameter) and sets it as
 `handler.__signature__` — the single source of truth the SDK introspects for the input schema. Values bind via
 psycopg `%(name)s` placeholders (dict params); the reserved `%(tz)s` placeholder auto-injects `REPORT_TIMEZONE`.
@@ -257,7 +260,10 @@ pointing at `ui://teslamate/charging-curve.html` — and that resource: a fully 
 `ui/notifications/initialized` → renders on `ui/notifications/tool-result`), draws two stacked SVG panels
 (battery %, charging power) with a shared crosshair/tooltip/data-table, follows host theme, and reports
 `ui/notifications/size-changed`. **Degrades gracefully**: non-Apps clients get the rows as plain structured
-content.
+content. `ResourceLinkedApps` (0.8.0+) additionally prepends a `resource_link` content block to UI-bound tool
+results via `intercept_tool_call` — Claude's connector implementation keys rendering off the result-level link.
+`telemetry.py` (0.8.0+) wires an OTLP/HTTP span exporter for the SDK's built-in OTel spans when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set; no-op otherwise.
 
 ### Prompts — `prompts.py`
 

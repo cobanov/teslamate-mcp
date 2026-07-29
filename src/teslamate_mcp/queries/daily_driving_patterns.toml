@@ -11,3 +11,27 @@ name = "days"
 type = "integer"
 description = "Restrict to the last N days. Omit for all time."
 minimum = 1
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "day_of_week"
+type = "number"
+
+[[output]]
+name = "day_name"
+type = "string"
+
+[[output]]
+name = "trip_count"
+type = "integer"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "avg_distance_km"
+type = "number"

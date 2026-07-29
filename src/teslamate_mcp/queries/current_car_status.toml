@@ -5,3 +5,51 @@ description = "Returns the latest recorded snapshot per car: battery level (%), 
 name = "car_name"
 type = "string"
 description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "rated_battery_range_km"
+type = "number"
+
+[[output]]
+name = "odometer"
+type = "number"
+
+[[output]]
+name = "outside_temp"
+type = "number"
+
+[[output]]
+name = "is_climate_on"
+type = "boolean"
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "state"
+type = "string"
+
+[[output]]
+name = "last_update"
+type = "string"

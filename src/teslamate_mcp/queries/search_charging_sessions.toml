@@ -34,3 +34,39 @@ description = "Maximum number of rows returned."
 default = 50
 minimum = 1
 maximum = 500
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "cost"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"

@@ -66,3 +66,23 @@ async def test_show_charging_curve_matches_plain_tool(mcp_session) -> None:
         assert rows == plain_result.structured_content["result"]
         assert len(rows) == 10
         assert {"bucket_start", "battery_level_start", "avg_power_kw"} <= set(rows[0])
+
+
+async def test_app_tool_result_carries_resource_link(mcp_session) -> None:
+    """Claude's renderer keys off a resource_link in the result (in addition
+    to tool _meta.ui); ResourceLinkedApps prepends one via intercept_tool_call."""
+    async with mcp_session() as session:
+        result = await session.call_tool(
+            "show_charging_curve", {"charging_process_id": _CURVE_SESSION_ID, "max_points": 10}
+        )
+        assert not result.is_error
+        link = result.content[0]
+        assert link.type == "resource_link"
+        assert str(link.uri) == CHARGING_CURVE_APP_URI
+        assert link.mime_type == "text/html;profile=mcp-app"
+
+        # The plain tool stays link-free.
+        plain = await session.call_tool(
+            "get_charging_curve", {"charging_process_id": _CURVE_SESSION_ID, "max_points": 10}
+        )
+        assert all(b.type != "resource_link" for b in plain.content)

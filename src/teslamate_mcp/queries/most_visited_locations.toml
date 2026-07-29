@@ -19,3 +19,23 @@ description = "Maximum number of rows returned."
 default = 15
 minimum = 1
 maximum = 100
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "state"
+type = "string"
+
+[[output]]
+name = "visit_count"
+type = "integer"
+
+[[output]]
+name = "total_time_spent_min"
+type = "integer"

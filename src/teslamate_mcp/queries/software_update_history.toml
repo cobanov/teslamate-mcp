@@ -5,3 +5,23 @@ description = "Per-car software update history: firmware version, update start a
 name = "car_name"
 type = "string"
 description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "version"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "update_duration_min"
+type = "number"

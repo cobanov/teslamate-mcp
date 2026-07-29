@@ -32,10 +32,13 @@ write path is `db.execute_write()`, used only by the opt-in `set_charging_cost` 
 (`ENABLE_CHARGING_WRITES=true`) and bounded by a column-scoped DB grant (`UPDATE (cost) ON charging_processes`).
 The declarative registry never writes.
 
-**Add a new tool**: drop a `<name>.sql` + `<name>.toml` (`name`, `description`, optional `[[params]]` tables)
-pair into `src/teslamate_mcp/queries/` — auto-discovered and contract-validated on restart, no code change.
-Params bind as `%(name)s` placeholders (cast first occurrence; escape literal `%` as `%%`; reserved `%(tz)s`
-binds `REPORT_TIMEZONE`).
+**Add a new tool**: drop a `<name>.sql` + `<name>.toml` (`name`, `description`, optional `[[params]]` and
+`[[output]]` tables) pair into `src/teslamate_mcp/queries/` — auto-discovered and contract-validated on restart,
+no code change. Params bind as `%(name)s` placeholders (cast first occurrence; escape literal `%` as `%%`;
+reserved `%(tz)s` binds `REPORT_TIMEZONE`). `[[output]]` columns (`name`, `type`, optional `description`) drive
+a typed per-column `outputSchema` (0.8.0+); columns are advisory — nullable, extras allowed — so drift
+under-documents but never breaks a call. OTel tracing exports when `OTEL_EXPORTER_OTLP_ENDPOINT` is set
+(`telemetry.py`); it is a no-op otherwise.
 
 **Common commands**: `uv sync`, `uv run ruff check/format src tests`, `uv run pytest`,
 `uv run teslamate-mcp {stdio|http|gen-token|list-tools}`.

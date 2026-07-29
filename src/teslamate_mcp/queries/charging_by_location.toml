@@ -17,3 +17,31 @@ name = "limit"
 type = "integer"
 description = "Maximum number of rows returned."
 minimum = 1
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "total_kwh"
+type = "number"
+
+[[output]]
+name = "avg_kwh_per_session"
+type = "number"
+
+[[output]]
+name = "total_minutes"
+type = "integer"
+
+[[output]]
+name = "total_cost"
+type = "number"

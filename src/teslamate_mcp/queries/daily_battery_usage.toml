@@ -20,3 +20,23 @@ description = "Only include days whose battery swing (max minus min, percentage 
 default = 5
 minimum = 0
 maximum = 100
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "date"
+type = "string"
+
+[[output]]
+name = "min_battery"
+type = "integer"
+
+[[output]]
+name = "max_battery"
+type = "integer"
+
+[[output]]
+name = "daily_usage"
+type = "integer"

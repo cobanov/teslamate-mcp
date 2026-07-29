@@ -11,3 +11,35 @@ name = "days"
 type = "integer"
 description = "Restrict to the last N days. Omit for all time."
 minimum = 1
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "month"
+type = "string"
+
+[[output]]
+name = "total_trips"
+type = "integer"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "avg_trip_distance_km"
+type = "number"
+
+[[output]]
+name = "total_driving_time_min"
+type = "integer"
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+
+[[output]]
+name = "max_speed_reached"
+type = "integer"

@@ -13,3 +13,23 @@ description = "Window in days. The default preserves the tool's original window.
 default = 730
 minimum = 28
 maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "month"
+type = "string"
+
+[[output]]
+name = "avg_rated_range"
+type = "number"
+
+[[output]]
+name = "max_rated_range"
+type = "number"
+
+[[output]]
+name = "data_points"
+type = "integer"

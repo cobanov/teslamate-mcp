@@ -5,3 +5,31 @@ description = "Latest battery snapshot per car: battery level and usable battery
 name = "car_name"
 type = "string"
 description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "usable_battery_level"
+type = "integer"
+
+[[output]]
+name = "rated_battery_range_km"
+type = "number"
+
+[[output]]
+name = "ideal_battery_range_km"
+type = "number"
+
+[[output]]
+name = "est_battery_range_km"
+type = "number"
+
+[[output]]
+name = "battery_health_pct"
+type = "number"
