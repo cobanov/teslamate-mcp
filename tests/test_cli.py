@@ -57,6 +57,28 @@ def test_http_stateless_flag_reaches_session_manager(monkeypatch):
     assert captured["mcp"].session_manager.stateless is True
 
 
+async def test_mcp_trailing_slash_is_normalized_not_redirected(monkeypatch):
+    """Regression: the Cloudflare portal's saved hostname ends in /mcp/ (the
+    SDK v1 canonical form) and cannot be edited; SDK v2 routes at /mcp and
+    307-redirects /mcp/, which the portal rejects (Cloudflare error 1003)."""
+    seen: dict = {}
+
+    async def downstream(scope, receive, send):
+        seen["path"] = scope["path"]
+        seen["raw_path"] = scope["raw_path"]
+
+    mw = cli.NormalizeMcpPathMiddleware(downstream)
+    await mw({"type": "http", "path": "/mcp/", "raw_path": b"/mcp/"}, None, None)
+    assert seen == {"path": "/mcp", "raw_path": b"/mcp"}
+
+    await mw({"type": "http", "path": "/health", "raw_path": b"/health"}, None, None)
+    assert seen["path"] == "/health"  # untouched
+
+    _, captured = _invoke_http(monkeypatch, ["--json-response"])
+    stack = [m.cls.__name__ for m in captured["app"].user_middleware]
+    assert "NormalizeMcpPathMiddleware" in stack
+
+
 def test_gen_token_prints_env_line():
     result = CliRunner().invoke(cli.main, ["gen-token"])
 

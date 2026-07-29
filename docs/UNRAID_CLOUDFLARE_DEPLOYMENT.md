@@ -343,6 +343,7 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 | Container restarts at boot | Bad `DATABASE_URL` (fail-fast) — check container log |
 | `401` even with token | Token mismatch: compare container `AUTH_TOKEN` vs portal custom header (`Bearer ` prefix included?) |
 | Portal server stuck "Sync Required" | Re-save the custom header credentials; **⋯ → Sync capabilities** |
+| Sync fails `HTTP 403` / `Error POSTing to endpoint: error code: 1003` | Trailing-slash mismatch: the portal's saved hostname ends in `/mcp/` (SDK v1's canonical form, and the hostname field is immutable) while SDK v2 serves `/mcp` and 307-redirects `/mcp/`; uvicorn's redirect behind the tunnel has a malformed `Location`, which Cloudflare rejects as 1003. Fixed in **0.6.1** — the server normalizes `/mcp/` to `/mcp`, so both forms answer directly. Upgrade the container, then **Sync capabilities** |
 | claude.ai "Authorization failed" at Connect | Known Managed-OAuth/connector issue — see Phase 4 fallbacks |
 | Tools list stale after adding a query | Portal syncs ~2h; force with **Sync capabilities** |
 

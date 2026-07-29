@@ -24,6 +24,27 @@ async def _health(_request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "version": __version__})
 
 
+class NormalizeMcpPathMiddleware:
+    """Rewrite `/mcp/` to `/mcp` before routing so both forms work.
+
+    SDK v1 mounted the transport (canonical `/mcp/`, bare `/mcp` redirected);
+    SDK v2 routes it (canonical `/mcp`, `/mcp/` redirects). Deployed clients —
+    notably the Cloudflare MCP portal, whose saved hostname is immutable — may
+    have either form configured, and uvicorn's redirect behind a tunnel emits
+    a malformed Location that Cloudflare rejects with error 1003.
+    """
+
+    def __init__(self, app) -> None:
+        self._app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http" and scope.get("path") == "/mcp/":
+            scope = dict(scope)
+            scope["path"] = "/mcp"
+            scope["raw_path"] = b"/mcp"
+        await self._app(scope, receive, send)
+
+
 def _configure_logging(level: str) -> None:
     logging.basicConfig(
         level=level.upper(),
@@ -99,6 +120,7 @@ def http(
         host=settings.host,
     )
     app.router.routes.append(Route("/health", _health, methods=["GET"]))
+    app.add_middleware(NormalizeMcpPathMiddleware)
 
     token = settings.auth_token.get_secret_value() if settings.auth_token else ""
     if token:
