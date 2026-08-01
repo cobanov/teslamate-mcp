@@ -4,6 +4,74 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-01
+
+### Added
+- **Seven new analytics queries** (23 → 30 predefined tools):
+  - `get_battery_capacity_trend` — usable battery capacity in kWh estimated from
+    charging sessions (energy added ÷ SOC gained), monthly per car. A real
+    energy-based degradation signal, unlike the rated-range heuristics.
+  - `get_vampire_drain` — rated range lost while parked between consecutive
+    drives, excluding any gap that contains a charging session.
+  - `get_charging_efficiency` — kWh added vs kWh drawn per car, split AC vs DC
+    (DC detected via charge samples with no charger phases).
+  - `get_charging_by_geofence` — charging totals per TeslaMate geofence
+    (Home/Work…), with sessions outside every geofence as "Ungeofenced".
+  - `get_soc_hygiene` — share of position samples above 80% / below 20% SOC.
+  - `get_period_comparison` — last N days vs the N days before, one row per
+    metric across driving and charging, with percent change.
+  - `get_drive_route` — NTILE-downsampled GPS track points for one drive.
+- **Two new MCP Apps** (`ui://` charts): `show_battery_degradation` (multi-car
+  monthly rated-range trend with legend and per-car deltas) and
+  `show_drive_route` (pure-SVG route map with start/end markers, scale bar,
+  hover readouts). `apps_ui.py` is now spec-driven: app tools are built from a
+  declarative `APP_SPECS` tuple via the registry's shared handler factory, so
+  an app tool's params, tz injection, and typed output schema can never drift
+  from its backing query (this also fixed the app path missing `%(tz)s`
+  injection).
+- **Confirmation before charging-cost writes**: `set_charging_cost` asks the
+  user via MCP elicitation when the client supports it (declarative
+  `Resolve`/`Elicit`, which works on the stateless 2026-07-28 transport).
+  Clients without form elicitation keep the previous direct-write behavior.
+- `get_database_schema(refresh=true)` re-reads `information_schema` on a
+  running server; previously DDL changes were only picked up on restart.
+- Tests for the previously untested `auth.py`, `prompts.py`, and
+  `resources.py`, including a cross-check that every tool name referenced in a
+  prompt is a registered tool (renames now fail CI instead of silently
+  breaking prompts).
+
+## [0.8.0] - 2026-07-29
+
+### Added
+- Typed per-column `outputSchema` for all 23 predefined tools via `[[output]]`
+  tables in the `.toml` contract (advisory: nullable fields, extras allowed).
+- `ResourceLinkedApps`: UI-bound tool results carry a result-level
+  `resource_link` block in addition to tool `_meta.ui`.
+- Optional OpenTelemetry export (`telemetry.py`) when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set; no-op otherwise.
+
+## [0.7.0] - 2026-07-29
+
+### Added
+- **MCP Apps pilot**: `show_charging_curve` renders an interactive
+  charging-curve chart in-conversation (self-contained `ui://` HTML app,
+  ext-apps spec 2026-01-26), degrading to plain rows on non-Apps clients.
+
+## [0.6.1] - 2026-07-29
+
+### Fixed
+- Portal sync: serve `/mcp` and `/mcp/` directly (`NormalizeMcpPathMiddleware`)
+  instead of 307-redirecting, which broke Cloudflare portal capability sync.
+
+## [0.6.0] - 2026-07-29
+
+### Changed
+- Migrated to MCP Python SDK v2 (`MCPServer`, spec 2026-07-28): dual-era
+  server (stateless new era + legacy `initialize` handshake), lifespan runs
+  once per process and owns the pool, stdlib logging replaces the deprecated
+  `ctx.info()`, 1 h `ttl_ms` cache hints on list endpoints, Docker CMD runs
+  `--json-response --stateless`.
+
 ## [0.5.1] - 2026-07-04
 
 ### Fixed

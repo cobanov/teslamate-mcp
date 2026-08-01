@@ -152,7 +152,7 @@ def list_tools_cmd() -> None:
     for tool in tools:
         params = ", ".join(p.name for p in tool.params) or "no params"
         click.echo(f"{tool.name:<45} {tool.source}  ({params})")
-    click.echo(f"{'get_database_schema':<45} (built-in)  (table)")
+    click.echo(f"{'get_database_schema':<45} (built-in)  (table, refresh)")
     click.echo(f"{'run_sql':<45} (built-in)  (query)")
     by_name = {t.name: t for t in tools}
     for spec in APP_SPECS:

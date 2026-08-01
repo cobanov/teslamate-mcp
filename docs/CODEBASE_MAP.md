@@ -10,11 +10,12 @@ total_tokens: 19934
 
 **teslamate-mcp** is a [Model Context Protocol](https://modelcontextprotocol.io) server that exposes a
 [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to AI assistants (Claude Desktop,
-Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **25 tools** (23 predefined analytics/search queries with
-typed optional parameters + `run_sql` + `get_database_schema`; +1 opt-in write tool `set_charging_cost`),
-**prompts**, and **2 resources**. Python 3.11+, built on the official `mcp[cli]` SDK **v2** (`MCPServer`, since
-0.6.0 — speaks both the stateless MCP **2026-07-28** revision and the legacy `initialize` handshake) and a
-`psycopg` 3 async pool owned by the once-per-process lifespan.
+Cursor, etc.) over **stdio** and **streamable HTTP**. It surfaces **35 tools** (30 predefined analytics/search
+queries with typed optional parameters + `run_sql` + `get_database_schema` + 3 MCP Apps chart tools; +1 opt-in
+write tool `set_charging_cost` with a capability-aware elicitation confirm), **prompts**, and **resources**
+(query index, per-query SQL, three `ui://` chart apps). Python 3.11+, built on the official `mcp[cli]` SDK
+**v2** (`MCPServer`, since 0.6.0 — speaks both the stateless MCP **2026-07-28** revision and the legacy
+`initialize` handshake) and a `psycopg` 3 async pool owned by the once-per-process lifespan.
 
 ---
 
@@ -40,7 +41,7 @@ graph TB
     end
 
     subgraph Surfaces["Registered MCP surfaces"]
-        Pre["23 predefined tools<br/>(tools/registry.py)"]
+        Pre["30 predefined tools<br/>(tools/registry.py)"]
         RunSQL["run_sql<br/>(tools/custom_sql.py)"]
         SchemaTool["get_database_schema<br/>(tools/schema_tool.py)"]
         Res["2 resources (resources.py)"]
@@ -55,7 +56,7 @@ graph TB
     end
 
     DB[("TeslaMate<br/>PostgreSQL")]
-    Queries["queries/*.sql + *.toml<br/>(23 bundled pairs)"]
+    Queries["queries/*.sql + *.toml<br/>(30 bundled pairs)"]
 
     IDE --> CLI
     Remote --> Auth --> MCPServer
@@ -101,11 +102,11 @@ teslamate-mcp/
 │   │   ├── __init__.py      # facade re-exporting the registration API
 │   │   ├── registry.py      # .sql+.toml -> MCP tool discovery & registration
 │   │   ├── custom_sql.py    # run_sql tool: validate_sql + enforce_limit
-│   │   ├── charging_write.py# opt-in set_charging_cost + receipts prompt (0.5.0+)
-│   │   ├── apps_ui.py       # MCP Apps ext: show_charging_curve + ui:// chart (0.7.0+)
-│   │   └── schema_tool.py   # get_database_schema tool
-│   ├── apps/                # self-contained HTML apps (charging_curve.html)
-│   └── queries/             # 23 × (<name>.sql + <name>.toml) bundled report pairs
+│   │   ├── charging_write.py# opt-in set_charging_cost + receipts prompt (0.5.0+, elicit confirm 0.9.0+)
+│   │   ├── apps_ui.py       # MCP Apps ext: APP_SPECS-driven show_* tools + ui:// charts (0.7.0+)
+│   │   └── schema_tool.py   # get_database_schema tool (refresh param 0.9.0+)
+│   ├── apps/                # self-contained HTML apps (charging curve, degradation, route map)
+│   └── queries/             # 30 × (<name>.sql + <name>.toml) bundled report pairs
 ├── tests/                   # pytest + pytest-asyncio + testcontainers[postgres]
 ├── pyproject.toml           # hatchling build, deps, ruff/pytest config, console script
 ├── Dockerfile               # multi-stage (uv builder -> slim runtime, non-root, /health)
@@ -237,9 +238,9 @@ The escape hatch for arbitrary read-only SQL. Two independent layers:
 
 ### Schema tool — `tools/schema_tool.py` (`get_database_schema`)
 
-Returns the cached schema from lifespan context; re-loads + re-caches only if `None`.
-**Gotcha**: cache is warmed once at startup and **never invalidated** on a running server — live DDL changes are
-picked up only on restart.
+Returns the cached schema from lifespan context; re-loads + re-caches when it is `None` **or when the caller
+passes `refresh=true`** (0.9.0+) — the on-demand path for live DDL changes; otherwise the cache lives until
+restart.
 
 ### Resources — `resources.py`
 
@@ -250,18 +251,21 @@ Two static MCP **resources** derived from the `PredefinedTool` list:
 **Why resources, not tools**: SDK resource handlers cannot receive a `Context`, so they're limited to static,
 pre-computed content (no live DB access).
 
-### MCP Apps — `tools/apps_ui.py` + `apps/charging_curve.html` (0.7.0+)
+### MCP Apps — `tools/apps_ui.py` + `apps/*.html` (0.7.0+, spec-driven 0.9.0+)
 
-`build_apps_extension(tools)` returns an SDK `Apps` extension (`io.modelcontextprotocol/ui`, ext-apps spec
-2026-01-26) passed to `MCPServer(extensions=[...])`. It registers `show_charging_curve` — same SQL as
-`get_charging_curve` (reused from the discovered registry, fail-fast if missing) with `_meta.ui.resourceUri`
-pointing at `ui://teslamate/charging-curve.html` — and that resource: a fully self-contained HTML app
-(`text/html;profile=mcp-app`, no external fetches) that speaks the postMessage handshake (`ui/initialize` →
-`ui/notifications/initialized` → renders on `ui/notifications/tool-result`), draws two stacked SVG panels
-(battery %, charging power) with a shared crosshair/tooltip/data-table, follows host theme, and reports
-`ui/notifications/size-changed`. **Degrades gracefully**: non-Apps clients get the rows as plain structured
-content. `ResourceLinkedApps` (0.8.0+) additionally prepends a `resource_link` content block to UI-bound tool
-results via `intercept_tool_call` — Claude's connector implementation keys rendering off the result-level link.
+`build_apps_extension(tools, report_timezone=…)` returns an SDK `Apps` extension
+(`io.modelcontextprotocol/ui`, ext-apps spec 2026-01-26) passed to `MCPServer(extensions=[...])`. It loops over
+the declarative **`APP_SPECS`** tuple — `show_charging_curve` → `get_charging_curve`,
+`show_battery_degradation` → `get_battery_degradation_over_time`, `show_drive_route` → `get_drive_route` — and
+builds each app tool via `registry.make_query_handler`, so an app tool shares its backing query's typed
+signature, tz injection, and `[[output]]` return type by construction (fail-fast `RuntimeError` if the backing
+query is missing). Each spec binds a fully self-contained HTML app (`text/html;profile=mcp-app`, no external
+fetches) that speaks the postMessage handshake (`ui/initialize` → `ui/notifications/initialized` → renders on
+`ui/notifications/tool-result`), draws SVG (stacked curve panels / multi-car trend lines / an equirectangular
+route map with scale bar), follows host theme, and reports `ui/notifications/size-changed`. **Degrades
+gracefully**: non-Apps clients get the rows as plain structured content. `ResourceLinkedApps` (0.8.0+)
+additionally prepends a `resource_link` content block to UI-bound tool results via `intercept_tool_call` —
+Claude's connector implementation keys rendering off the result-level link.
 `telemetry.py` (0.8.0+) wires an OTLP/HTTP span exporter for the SDK's built-in OTel spans when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set; no-op otherwise.
 
@@ -275,7 +279,7 @@ reference (no cross-check).
 
 ---
 
-## The Query Catalog (23 predefined tools)
+## The Query Catalog (30 predefined tools)
 
 Since 0.4.0 every tool accepts **typed optional params** — `car_name` everywhere, plus `days`/`limit`/thresholds
 where applicable (zero-arg calls preserve the classic full report). The `.toml` contract is `name` + `description`
@@ -305,10 +309,21 @@ where applicable (zero-arg calls preserve the classic full report). The `.toml` 
 | `search_drives` | Drive search: date range, location text, distance bounds, sort | `drives`, `cars`, `addresses` |
 | `search_charging_sessions` | Charging-session search: date range, location, min energy | `charging_processes`, `cars`, `addresses` |
 | `get_drive_details` | Full stats for one drive (**drive_id required**) | `drives`, `cars`, `addresses` |
+| `get_drive_route` | NTILE-downsampled GPS track points for one drive (**drive_id required**) | `drives`, `positions` |
 | `get_charging_curve` | NTILE-downsampled power/SOC curve for one session (**charging_process_id required**) | `charges` |
 | `get_charging_costs` | Cost totals grouped by month/location/car | `charging_processes`, `cars`, `addresses` |
 
-**Plus 2 built-ins**: `get_database_schema(table=None)` and `run_sql(query)` = **25 tools total** — 26 when
+| Insight tools (0.9.0) | Purpose | TeslaMate tables |
+|-----------------------|---------|------------------|
+| `get_battery_capacity_trend` | Usable kWh per month from charge sessions (energy added ÷ SOC gained, min_soc_delta filter) | `charging_processes`, `cars` |
+| `get_vampire_drain` | Rated range lost in drive-to-drive parking gaps with no charge (inclusive overlap bounds) | `drives`, `charging_processes`, `cars`, `addresses` |
+| `get_charging_efficiency` | kWh added vs used per car × AC/DC (DC = charges row with `charger_phases IS NULL`) | `charging_processes`, `charges`, `cars` |
+| `get_charging_by_geofence` | Session/kWh/cost totals per geofence + 'Ungeofenced' bucket | `charging_processes`, `geofences`, `cars` |
+| `get_soc_hygiene` | % of samples above 80 / below 20 SOC (unweighted sample counts) | `positions`, `cars` |
+| `get_period_comparison` | Last N days vs previous N days, one row per metric (**all cars combined** unless filtered) | `drives`, `charging_processes`, `cars` |
+
+**Plus 2 built-ins** (`get_database_schema(table=None, refresh=False)` and `run_sql(query)`) and **3 MCP Apps
+tools** (`show_charging_curve`, `show_battery_degradation`, `show_drive_route`) = **35 tools total** — 36 when
 `ENABLE_CHARGING_WRITES=true` adds `set_charging_cost` (plus the `backfill_costs_from_receipts` prompt).
 
 ### Inferred TeslaMate schema
@@ -392,8 +407,12 @@ cover `serialization`, `custom_sql` validators, and registry discovery. `test_re
 test that `ctx` never leaks into any tool's `input_schema` (the 0.3.1 fix) plus generated-schema assertions;
 `test_cli.py` covers the CLI incl. the `--json-response`/`--stateless` session-manager wiring;
 `tests/test_registry_params.py` covers the TOML `[[params]]` contract; `tests/test_tools_e2e.py` runs **every**
-bundled query against a seeded TeslaMate-shaped Postgres (param binding, timezone bucketing, schema tool,
-sequential-session pool hygiene). 82 tests total. **Still untested**: `auth.py`, `prompts.py`, `resources.py`.
+bundled query against a seeded TeslaMate-shaped Postgres (param binding, timezone bucketing, schema tool +
+refresh, sequential-session pool hygiene, targeted value assertions for the 0.9.0 insight queries);
+`test_charging_write.py` covers the elicitation confirm's accept/decline/no/degrade branches (the in-memory
+`Client` advertises elicitation only when an `elicitation_callback` is passed); `test_auth.py` (TestClient),
+`test_prompts.py` (incl. the backticked-tool-name cross-check), and `test_resources.py` close the former
+coverage gaps. 119 tests total.
 
 **Docker**: multi-stage — `uv sync --frozen --no-dev` in a builder, copied into a slim non-root (`mcp`, uid 1000)
 runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` runs
@@ -426,7 +445,8 @@ runtime with only `libpq5`. `EXPOSE 8888`, `HEALTHCHECK` hits `/health`, `CMD` r
    Discovery lints these at startup.
 3. **`fetch_all` has no read-only/timeout guard** — safe only because its SQL is curated. New predefined queries
    must be manually verified non-mutating.
-4. **Schema cache never invalidates** on a live server — DDL changes need a restart.
+4. **Schema cache invalidates only on restart or an explicit `get_database_schema(refresh=true)` call** —
+   nothing refreshes it automatically.
 5. **Metric-only + timezone-naive** query results.
 6. **`fetch_readonly` is the real `run_sql` safety net** — the regex validator is defense-in-depth, not the guarantee.
 7. `__version__` reads `0.0.0+unknown` if run from source without an (editable) install.
