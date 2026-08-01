@@ -1,0 +1,72 @@
+name = "search_charging_sessions"
+description = "Search individual charging sessions with flexible filters: date range (local calendar dates), car, free-text location match, and minimum energy added (kWh). Returns charging_process_id (usable with get_charging_curve), timestamps, energy added kWh, duration, cost, and location. Newest first; 50 rows max by default."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "start_date"
+type = "string"
+description = "Earliest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "end_date"
+type = "string"
+description = "Latest local calendar date to include, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the charging address name and city."
+
+[[params]]
+name = "min_energy_kwh"
+type = "number"
+description = "Only sessions that added at least this many kWh."
+minimum = 0
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 50
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "cost"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"

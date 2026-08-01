@@ -8,10 +8,10 @@ a single-click entry point in MCP-aware UIs.
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 
-def register_prompts(mcp: FastMCP) -> None:
+def register_prompts(mcp: MCPServer) -> None:
     """Attach the prompt catalog to the server."""
 
     @mcp.prompt(
@@ -40,10 +40,12 @@ def register_prompts(mcp: FastMCP) -> None:
         return (
             f"Summarize driving habits for the {window}:\n"
             "1. Call `get_monthly_driving_summary` and `get_drive_summary_per_day` "
-            "for totals.\n"
-            "2. Call `get_daily_driving_patterns` to identify usage peaks "
-            "(day of week, time of day).\n"
-            "3. Call `get_longest_drives_by_distance` for the standout trips.\n"
+            "for totals — pass a `days` argument matching the requested window "
+            "(e.g. days=30).\n"
+            "2. Call `get_daily_driving_patterns` (same `days`) to identify usage "
+            "peaks by day of week.\n"
+            "3. Call `get_longest_drives_by_distance` for the standout trips, or "
+            "`search_drives` with a date range for a specific period.\n"
             "4. Produce a short report: total distance, average drive length, "
             "peak day, most-used time slot, and any notable outliers."
         )
@@ -57,10 +59,12 @@ def register_prompts(mcp: FastMCP) -> None:
             "Build a complete picture of charging behavior:\n"
             "1. Call `get_all_charging_sessions_summary` for the totals.\n"
             "2. Call `get_charging_by_location` to see where charging happens.\n"
-            "3. Call `get_most_visited_locations` to correlate charging spots "
-            "with frequent stops.\n"
-            "4. Highlight: home-vs-public split, kWh added per location, and "
-            "any session that looks unusually slow or expensive."
+            "3. Call `get_charging_costs` with group_by='month' and again with "
+            "group_by='location' for the cost breakdown.\n"
+            "4. Highlight: home-vs-public split, kWh added per location, cost "
+            "per kWh trends, and any session that looks unusually slow or "
+            "expensive — for a suspicious session, call `get_charging_curve` "
+            "with its charging_process_id to inspect the power curve."
         )
 
     @mcp.prompt(

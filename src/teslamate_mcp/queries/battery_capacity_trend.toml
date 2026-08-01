@@ -1,0 +1,50 @@
+name = "get_battery_capacity_trend"
+description = "Estimate real usable battery capacity (kWh) per month from charging sessions: capacity = energy added / SOC gained, using only sessions that gained at least min_soc_delta percentage points (larger deltas give more reliable estimates). More credible than rated-range degradation heuristics. Monthly buckets follow REPORT_TIMEZONE; one row per car per month."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to include charging sessions from."
+default = 730
+minimum = 28
+maximum = 3650
+
+[[params]]
+name = "min_soc_delta"
+type = "integer"
+description = "Minimum battery percentage points gained in a session for it to count. Higher values give fewer but more reliable capacity estimates."
+default = 15
+minimum = 5
+maximum = 90
+
+[[output]]
+name = "month"
+type = "string"
+description = "Calendar month (YYYY-MM) in REPORT_TIMEZONE."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "avg_est_capacity_kwh"
+type = "number"
+description = "Mean estimated usable capacity across the month's qualifying sessions."
+
+[[output]]
+name = "min_est_capacity_kwh"
+type = "number"
+
+[[output]]
+name = "max_est_capacity_kwh"
+type = "number"
+
+[[output]]
+name = "sessions"
+type = "integer"
+description = "Number of qualifying charging sessions in the bucket."

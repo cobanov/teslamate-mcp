@@ -1,0 +1,96 @@
+name = "get_drive_details"
+description = "Full statistics for one specific drive by its drive_id (find ids with search_drives): timestamps, distance km, duration, average/max speed, power extremes, inside/outside temperature °C, odometer start/end, rated range used km, range-based consumption %, and start/end locations."
+
+[[params]]
+name = "drive_id"
+type = "integer"
+description = "The drive's id, as returned by search_drives or get_longest_drives_by_distance."
+required = true
+
+[[output]]
+name = "drive_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "avg_speed_kmh"
+type = "number"
+
+[[output]]
+name = "speed_max"
+type = "integer"
+
+[[output]]
+name = "power_max"
+type = "integer"
+
+[[output]]
+name = "power_min"
+type = "integer"
+
+[[output]]
+name = "inside_temp_avg"
+type = "number"
+
+[[output]]
+name = "outside_temp_avg"
+type = "number"
+
+[[output]]
+name = "odometer_start_km"
+type = "number"
+
+[[output]]
+name = "odometer_end_km"
+type = "number"
+
+[[output]]
+name = "start_rated_range_km"
+type = "number"
+
+[[output]]
+name = "end_rated_range_km"
+type = "number"
+
+[[output]]
+name = "rated_range_used_km"
+type = "number"
+
+[[output]]
+name = "consumption_pct"
+type = "number"
+
+[[output]]
+name = "start_location"
+type = "string"
+
+[[output]]
+name = "start_city"
+type = "string"
+
+[[output]]
+name = "end_location"
+type = "string"
+
+[[output]]
+name = "end_city"
+type = "string"

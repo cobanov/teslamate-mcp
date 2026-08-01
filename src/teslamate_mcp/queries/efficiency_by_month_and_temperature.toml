@@ -1,2 +1,38 @@
 name = "get_efficiency_by_month_and_temperature"
-description = "Get the efficiency by month and temperature for each car. Analyzes how seasonal temperature changes affect vehicle efficiency."
+description = "Returns per-car monthly driving stats bucketed by local calendar month over the last 365 days by default: average outside temperature (°C), total distance (km), drive count, and average distance per drive (km). Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Window in days. The default preserves the tool's original window."
+default = 365
+minimum = 28
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "month"
+type = "string"
+
+[[output]]
+name = "avg_temp"
+type = "number"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "drive_count"
+type = "integer"
+
+[[output]]
+name = "avg_distance_per_drive"
+type = "number"

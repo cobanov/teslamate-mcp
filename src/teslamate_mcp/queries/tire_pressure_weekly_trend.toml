@@ -1,2 +1,46 @@
 name = "get_tire_pressure_weekly_trends"
-description = "Get the tire pressure weekly trends for each car. Monitors tire pressure changes and patterns by week."
+description = "Per-car weekly tire pressure trend: average pressure per tire and overall weekly average (bar), plus reading count, bucketed by week in the report timezone. Defaults to the last 90 days. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Window in days. The default preserves the tool's original window."
+default = 90
+minimum = 7
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "week"
+type = "string"
+
+[[output]]
+name = "avg_front_left"
+type = "number"
+
+[[output]]
+name = "avg_front_right"
+type = "number"
+
+[[output]]
+name = "avg_rear_left"
+type = "number"
+
+[[output]]
+name = "avg_rear_right"
+type = "number"
+
+[[output]]
+name = "weekly_avg_pressure"
+type = "number"
+
+[[output]]
+name = "readings_count"
+type = "integer"

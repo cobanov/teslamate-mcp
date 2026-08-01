@@ -1,2 +1,37 @@
 name = "get_total_distance_and_efficiency"
-description = "Get the total distance and efficiency for each car. Provides lifetime statistics for distance traveled and energy efficiency."
+description = "Per-car driving totals: drive count, total and average distance (km), average outside temperature (°C), and average max speed. Covers all time by default. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "total_drives"
+type = "integer"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "avg_distance_per_drive"
+type = "number"
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+
+[[output]]
+name = "avg_max_speed"
+type = "number"

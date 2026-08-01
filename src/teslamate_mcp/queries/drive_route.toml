@@ -1,0 +1,50 @@
+name = "get_drive_route"
+description = "The GPS route of one drive as an ordered list of downsampled track points (time-bucketed averages): timestamp, latitude/longitude, battery level, max speed (km/h), and average power (kW) per point. Find drive ids with search_drives. Useful for mapping a trip or inspecting where speed/power peaked."
+
+[[params]]
+name = "drive_id"
+type = "integer"
+description = "The drive's id, as returned by search_drives or get_longest_drives_by_distance."
+required = true
+
+[[params]]
+name = "max_points"
+type = "integer"
+description = "Maximum number of route points (time buckets) to return."
+default = 200
+minimum = 10
+maximum = 2000
+
+[[output]]
+name = "point_order"
+type = "integer"
+description = "1-based position of the point along the route."
+
+[[output]]
+name = "ts"
+type = "string"
+description = "Timestamp of the bucket's first sample (UTC)."
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "speed_max_kmh"
+type = "integer"
+
+[[output]]
+name = "avg_power_kw"
+type = "number"
+
+[[output]]
+name = "odometer_km"
+type = "number"

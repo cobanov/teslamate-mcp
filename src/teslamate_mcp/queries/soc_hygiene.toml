@@ -1,0 +1,46 @@
+name = "get_soc_hygiene"
+description = "Battery state-of-charge hygiene per car: share of logged samples above 80% and below 20%, plus average/min/max SOC over the window. Percentages are unweighted position-sample counts (TeslaMate logs densely while the car is awake), not time-weighted. Useful for battery-care habits like charge-limit discipline."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to include position samples from."
+default = 30
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "samples"
+type = "integer"
+description = "Number of position samples with a battery level in the window."
+
+[[output]]
+name = "avg_soc"
+type = "number"
+
+[[output]]
+name = "pct_above_80"
+type = "number"
+description = "Percent of samples with battery level above 80%."
+
+[[output]]
+name = "pct_below_20"
+type = "number"
+description = "Percent of samples with battery level below 20%."
+
+[[output]]
+name = "min_soc"
+type = "integer"
+
+[[output]]
+name = "max_soc"
+type = "integer"

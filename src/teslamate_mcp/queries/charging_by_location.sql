@@ -7,7 +7,11 @@ SELECT a.display_name as location,
     SUM(COALESCE(cp.cost, 0)) as total_cost
 FROM charging_processes cp
     JOIN addresses a ON cp.address_id = a.id
+    JOIN cars c ON cp.car_id = c.id
+WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
+    AND (%(days)s::int IS NULL OR cp.start_date >= CURRENT_DATE - make_interval(days => %(days)s))
 GROUP BY a.id,
     a.display_name,
     a.city
-ORDER BY sessions DESC;
+ORDER BY sessions DESC
+LIMIT %(limit)s::int;

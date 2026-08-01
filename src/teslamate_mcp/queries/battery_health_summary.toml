@@ -1,2 +1,35 @@
 name = "get_battery_health_summary"
-description = "Get the battery health summary for each car. Provides current battery health status and statistics."
+description = "Latest battery snapshot per car: battery level and usable battery level (%), rated/ideal/estimated range (km), and battery health as the rated-to-ideal range ratio (%). Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "usable_battery_level"
+type = "integer"
+
+[[output]]
+name = "rated_battery_range_km"
+type = "number"
+
+[[output]]
+name = "ideal_battery_range_km"
+type = "number"
+
+[[output]]
+name = "est_battery_range_km"
+type = "number"
+
+[[output]]
+name = "battery_health_pct"
+type = "number"

@@ -26,12 +26,34 @@ def build_pool(settings: Settings) -> AsyncConnectionPool:
 async def fetch_all(
     pool: AsyncConnectionPool,
     query: str,
-    params: tuple[Any, ...] | None = None,
+    params: tuple[Any, ...] | dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run a trusted query and return JSON-safe rows. Used for predefined SQL files."""
+    """Run a trusted query and return JSON-safe rows. Used for predefined SQL files.
+
+    Dict params bind to `%(name)s` placeholders. When params is not None, literal
+    percent signs in the SQL must be escaped as `%%`.
+    """
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(query, params)
         rows = await cur.fetchall()
+    return rows_to_jsonable(rows)
+
+
+async def execute_write(
+    pool: AsyncConnectionPool,
+    query: str,
+    params: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Run a trusted, parameterized write and COMMIT; return RETURNING rows.
+
+    This is the ONLY sanctioned write path in the codebase. Callers are
+    hand-written tools gated by Settings.enable_charging_writes; the DB role's
+    column-scoped grant (e.g. UPDATE (cost) ON charging_processes) is the real
+    boundary. Never route user-supplied SQL through here.
+    """
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(query, params)
+        rows = await cur.fetchall() if cur.description is not None else []
     return rows_to_jsonable(rows)
 
 

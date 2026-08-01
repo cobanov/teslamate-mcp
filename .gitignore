@@ -1,3 +1,9 @@
+# Internal docs with real deployment values — never committed
+docs_internal/
+
+# Local AI-assistant instructions (kept out of the public tree)
+/CLAUDE.md
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -204,3 +210,4 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+.DS_Store

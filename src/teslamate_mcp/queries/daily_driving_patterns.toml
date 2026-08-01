@@ -1,2 +1,37 @@
 name = "get_daily_driving_patterns"
-description = "Get the daily driving patterns for each car. Shows driving habits and patterns by day of week and time."
+description = "Returns per-car driving patterns by local day of week: trip count, total distance (km), and average distance per trip (km) for each weekday, over all time by default. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "day_of_week"
+type = "number"
+
+[[output]]
+name = "day_name"
+type = "string"
+
+[[output]]
+name = "trip_count"
+type = "integer"
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "avg_distance_km"
+type = "number"

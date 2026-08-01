@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>teslamate-mcp</Name>
+  <Repository>ghcr.io/cobanov/teslamate-mcp:latest</Repository>
+  <Registry>https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/cobanov/teslamate-mcp/issues</Support>
+  <Project>https://github.com/cobanov/teslamate-mcp</Project>
+  <Overview>
+    Model Context Protocol (MCP) server that exposes your TeslaMate PostgreSQL database
+    to AI assistants (Claude, Cursor, ...) over streamable HTTP.
+    35 tools (30 predefined analytics queries + run_sql + get_database_schema +
+    3 interactive MCP Apps charts), 6 prompts, resources.
+
+    Requires a running TeslaMate + PostgreSQL stack.
+    Endpoint: http://[IP]:[PORT:8888]/mcp - Health: http://[IP]:[PORT:8888]/health
+    Protect the endpoint with AUTH_TOKEN (bearer auth) before exposing it
+    through a Cloudflare Tunnel / MCP Server Portal.
+  </Overview>
+  <Category>Tools:</Category>
+  <WebUI/>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams/>
+  <PostArgs/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>TeslaMate and its PostgreSQL database must already be running.</Requires>
+  <Config Name="MCP HTTP port" Target="8888" Default="8888" Mode="tcp"
+          Description="Streamable HTTP MCP endpoint (/mcp) and liveness probe (/health)."
+          Type="Port" Display="always" Required="true" Mask="false">8888</Config>
+  <Config Name="DATABASE_URL" Target="DATABASE_URL"
+          Default="postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
+          Description="PostgreSQL connection string for the TeslaMate database. Use the Unraid host IP and the credentials from your TeslaMate PostgreSQL container. A SELECT-only role is recommended."
+          Type="Variable" Display="always" Required="true" Mask="true">postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate</Config>
+  <Config Name="AUTH_TOKEN" Target="AUTH_TOKEN" Default="" Mode=""
+          Description="Bearer token protecting /mcp. Generate with: openssl rand -base64 32 (or `teslamate-mcp gen-token`). Leave empty ONLY for LAN-only unauthenticated use - never when exposed via tunnel."
+          Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="INFO" Mode=""
+          Description="Python log level (DEBUG, INFO, WARNING, ERROR)."
+          Type="Variable" Display="advanced" Required="false" Mask="false">INFO</Config>
+  <Config Name="QUERY_TIMEOUT_MS" Target="QUERY_TIMEOUT_MS" Default="5000" Mode=""
+          Description="statement_timeout (ms) applied to run_sql custom queries."
+          Type="Variable" Display="advanced" Required="false" Mask="false">5000</Config>
+  <Config Name="CUSTOM_SQL_ROW_LIMIT" Target="CUSTOM_SQL_ROW_LIMIT" Default="1000" Mode=""
+          Description="Row cap injected into run_sql queries that lack an explicit LIMIT."
+          Type="Variable" Display="advanced" Required="false" Mask="false">1000</Config>
+</Container>

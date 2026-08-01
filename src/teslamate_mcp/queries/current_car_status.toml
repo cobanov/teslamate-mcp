@@ -1,2 +1,55 @@
 name = "get_current_car_status"
-description = "Get the current car status for each car. Returns real-time vehicle status including location, battery level, and state."
+description = "Returns the latest recorded snapshot per car: battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "rated_battery_range_km"
+type = "number"
+
+[[output]]
+name = "odometer"
+type = "number"
+
+[[output]]
+name = "outside_temp"
+type = "number"
+
+[[output]]
+name = "is_climate_on"
+type = "boolean"
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "state"
+type = "string"
+
+[[output]]
+name = "last_update"
+type = "string"

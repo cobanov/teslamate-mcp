@@ -16,4 +16,5 @@ WHERE p.date = (
         SELECT MAX(date)
         FROM positions p2
         WHERE p2.car_id = p.car_id
-    );
+    )
+    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%');

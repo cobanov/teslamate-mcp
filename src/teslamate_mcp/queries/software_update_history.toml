@@ -1,2 +1,27 @@
 name = "get_software_update_history"
-description = "Get the software update history for each car. Tracks firmware updates and version changes over time."
+description = "Per-car software update history: firmware version, update start and end timestamps, and update duration (minutes), newest first. Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "version"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "update_duration_min"
+type = "number"

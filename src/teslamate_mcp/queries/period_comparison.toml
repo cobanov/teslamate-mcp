@@ -1,0 +1,33 @@
+name = "get_period_comparison"
+description = "Compare the last N days against the N days before them in one call: driving (distance km, drive count) and charging (kWh added, cost, session count) as one row per metric with current value, previous value, and percent change (null when the previous window is empty). Rolling windows anchored at the current instant, all cars combined unless filtered."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Window length in days: compares [now-days, now) against [now-2*days, now-days)."
+default = 30
+minimum = 1
+maximum = 365
+
+[[output]]
+name = "metric"
+type = "string"
+description = "One of distance_km, drive_count, kwh_added, charge_cost, charge_sessions."
+
+[[output]]
+name = "current_value"
+type = "number"
+
+[[output]]
+name = "previous_value"
+type = "number"
+
+[[output]]
+name = "change_pct"
+type = "number"
+description = "100 * (current - previous) / previous; null when the previous window is empty."

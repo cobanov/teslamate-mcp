@@ -1,2 +1,35 @@
 name = "get_drive_summary_per_day"
-description = "Get the drive summary per day for each car. Provides daily driving statistics including distance, duration, and efficiency."
+description = "Returns daily drive totals for the whole fleet (all cars combined): drive count, total distance (km), and total driving time (minutes) per local calendar day, most recent day first, unlimited rows by default. Optional filters: car_name, days, limit."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+minimum = 1
+
+[[output]]
+name = "drive_day"
+type = "string"
+
+[[output]]
+name = "drive_count"
+type = "integer"
+
+[[output]]
+name = "total_km"
+type = "number"
+
+[[output]]
+name = "total_minutes"
+type = "integer"
