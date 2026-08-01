@@ -1,8 +1,12 @@
-"""Tests for the click CLI entry points (no live DB or network needed)."""
+"""Tests for the click CLI entry points. Only the live-database health test needs Docker."""
 
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+
 from click.testing import CliRunner
+from starlette.testclient import TestClient
 
 from teslamate_mcp import cli
 
@@ -85,3 +89,29 @@ def test_gen_token_prints_env_line():
     assert result.exit_code == 0
     assert result.output.startswith("AUTH_TOKEN=")
     assert len(result.output.strip().removeprefix("AUTH_TOKEN=")) >= 32
+
+
+def test_health_reports_degraded_when_the_database_is_unavailable(monkeypatch):
+    """Regression: /health answered `ok` while every MCP call failed with a 500.
+
+    The probe backs the Dockerfile HEALTHCHECK, so a liveness-only answer made
+    a container that could not reach PostgreSQL look healthy indefinitely.
+    """
+    _, captured = _invoke_http(monkeypatch, [])
+    # No lifespan is entered here, so the pool is closed — the same state a
+    # container is in when PostgreSQL is unreachable.
+    response = TestClient(captured["app"]).get("/health")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["database"] in {"unavailable", "unreachable"}
+
+
+async def test_health_reports_ok_against_a_live_database(pool):
+    handler = cli._make_health(SimpleNamespace(teslamate_app_context=SimpleNamespace(pool=pool)))
+
+    response = await handler(SimpleNamespace())
+
+    assert response.status_code == 200
+    assert json.loads(response.body)["database"] == "ok"

@@ -42,6 +42,14 @@ class Settings(BaseSettings):
         ge=100,
         description="statement_timeout applied to custom SQL queries.",
     )
+    statement_timeout_ms: int = Field(
+        default=30000,
+        ge=100,
+        description=(
+            "Connection-level statement_timeout bounding every query, including "
+            "the bundled reports. Ignored when DATABASE_URL sets its own options."
+        ),
+    )
     custom_sql_row_limit: int = Field(
         default=1000,
         ge=1,

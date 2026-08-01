@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-02
+
+### Fixed
+- **`get_battery_health_summary` and `get_current_car_status` never returned on
+  a large database.** Both selected the newest position per car with a
+  correlated subquery — `WHERE p.date = (SELECT MAX(date) FROM positions p2
+  WHERE p2.car_id = p.car_id)` — which re-scans the whole `positions` table
+  once per candidate row. On a 3.1M-row table PostgreSQL costed the plan at
+  ~2.6e11 and it never completed. Both now take the latest position through a
+  `LATERAL` top-1 driven from `cars`, which also lets the `car_name` filter cut
+  the set before any positions lookup: 0.9s and 1.1s respectively on the same
+  database, against no result at all before.
+- **A slow query could pin a PostgreSQL backend indefinitely.** The predefined
+  query path (`fetch_all`) set no `statement_timeout`, so a pathological query
+  hung the MCP client with no error while the server kept burning CPU — and
+  killing the client did not cancel the server-side query. The pool now sets a
+  connection-level `statement_timeout` bounding every query it runs, tunable
+  with the new `STATEMENT_TIMEOUT_MS` (default 30s) and skipped when
+  `DATABASE_URL` carries its own libpq `options=`.
+- **`/health` reported `ok` while the server could not serve at all.** The
+  probe never touched the database, so a container whose pool could not reach
+  PostgreSQL — every MCP call returning 500 — was still marked healthy by the
+  Docker `HEALTHCHECK`. It now performs a real `SELECT 1` (3s cap) and returns
+  `503` with `{"status": "degraded", "database": "unreachable", "detail": …}`
+  when that fails.
+
+### Added
+- `STATEMENT_TIMEOUT_MS` setting (default `30000`).
+- `/health` now reports a `database` field alongside `status` and `version`.
+
+### Changed
+- README rewritten and cut roughly in half; the reference material it used to
+  carry now lives in the [wiki](https://github.com/cobanov/teslamate-mcp/wiki)
+  (tool reference, configuration, deployment, writing queries, write tools,
+  development).
+
 ## [0.9.1] - 2026-08-01
 
 ### Fixed
