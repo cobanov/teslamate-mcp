@@ -86,7 +86,7 @@ Option B — manual (**Docker → Add Container**):
 | Field | Value |
 |---|---|
 | Name | `teslamate-mcp` |
-| Repository | `ghcr.io/batubozkan/teslamate-mcp:latest` (this repo's release image, v0.4.0+) |
+| Repository | `ghcr.io/cobanov/teslamate-mcp:latest` (this repo's release image, v0.4.0+) |
 | Network type | `bridge` |
 | Port | host `8888` → container `8888` (TCP) |
 | Env `DATABASE_URL` | `postgresql://teslamate_ro:<pw>@192.168.1.100:5432/teslamate` (or the main `teslamate` user) |
@@ -94,8 +94,8 @@ Option B — manual (**Docker → Add Container**):
 | Env `REPORT_TIMEZONE` | `Europe/Istanbul` (IANA name; daily/monthly buckets follow local midnight) |
 | Env `LOG_LEVEL` | `INFO` |
 
-> **Private image:** `ghcr.io/batubozkan/teslamate-mcp` is a private GHCR package. Before the
-> first pull, run `docker login ghcr.io -u batubozkan` on the Unraid terminal with a GitHub
+> **Private image:** `ghcr.io/cobanov/teslamate-mcp` is a private GHCR package. Before the
+> first pull, run `docker login ghcr.io -u <your-github-username>` on the Unraid terminal with a GitHub
 > PAT (classic, `read:packages` scope) — or make the package public in its GitHub settings.
 > Releases are published by pushing a `v*` tag (`git tag v0.x.y && git push origin v0.x.y`).
 
@@ -341,7 +341,7 @@ Receipt workflow: use the `backfill_costs_from_receipts` prompt, or just tell Cl
 
 | Symptom | Likely cause / fix |
 |---|---|
-| Crash at startup: `no field "streamable_http_json_response"` | Only on the old upstream `0.3.1` image — upgrade to `ghcr.io/batubozkan/teslamate-mcp:0.4.0+` (or see the historical workaround in Phase 1.3) |
+| Crash at startup: `no field "streamable_http_json_response"` | Only on the old upstream `0.3.1` image — upgrade to `ghcr.io/cobanov/teslamate-mcp:0.4.0+` (or see the historical workaround in Phase 1.3) |
 | Portal shows old tool count after upgrading the container | Sync ran while the container was restarting — re-run **⋯ → Sync capabilities** once `/health` responds |
 | `set_charging_cost` fails with `InsufficientPrivilege` | The column grant is missing — run `GRANT UPDATE (cost) ON charging_processes TO teslamate_ro;` in the Postgres console |
 | GHCR push from release workflow fails `403 Forbidden` | An existing `teslamate-mcp` package isn't linked to the repo (e.g. orphaned from a deleted repo) — delete the stale package or grant the repo **Write** under the package's *Manage Actions access* |

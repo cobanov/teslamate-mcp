@@ -6,14 +6,12 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io/) server that exposes your [TeslaMate](https://github.com/teslamate-org/teslamate) PostgreSQL database to MCP-aware AI clients (Claude Desktop, Cursor, etc.) over either stdio or streamable HTTP.
 
-[![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
-[![GHCR](https://img.shields.io/badge/ghcr.io-batubozkan%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/batubozkan/teslamate-mcp/pkgs/container/teslamate-mcp)
+[![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-cobanov%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/github/license/batubozkan/teslamate-mcp)](LICENSE)
+[![License](https://img.shields.io/github/license/cobanov/teslamate-mcp)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-
-Fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp) carrying the 0.4.0+ feature line: typed tool parameters & outputs, 12 additional analytics/search tools, MCP SDK v2 (spec 2026-07-28), interactive MCP Apps charts, opt-in charging-cost writes with elicitation confirm, and OpenTelemetry export.
 
 </div>
 
@@ -39,7 +37,7 @@ Fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp) carryi
 ## Install
 
 ```bash
-git clone https://github.com/batubozkan/teslamate-mcp.git
+git clone https://github.com/cobanov/teslamate-mcp.git
 cd teslamate-mcp
 cp env.example .env
 # Edit .env — at minimum, set DATABASE_URL
@@ -87,7 +85,7 @@ The MCP endpoint is at `http://localhost:8888/mcp` and a liveness probe is expos
 A prebuilt multi-arch image (`linux/amd64`, `linux/arm64`) is also published to GHCR on every tagged release:
 
 ```bash
-docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/batubozkan/teslamate-mcp:latest
+docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/cobanov/teslamate-mcp:latest
 ```
 
 ## Configuration
@@ -228,4 +226,4 @@ uv run pytest                    # tests (Docker-backed integration tests skip i
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Based on [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp) by Mert Cobanov.
+MIT — see [LICENSE](LICENSE).
