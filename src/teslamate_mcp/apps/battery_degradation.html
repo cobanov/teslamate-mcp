@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Battery degradation</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1d8a63;
+    --series-4: #a256c9;
+    --series-5: #c9375f;
+    --series-6: #8a7a1d;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #27a578;
+      --series-4: #b06bd6;
+      --series-5: #d9527a;
+      --series-6: #a89a3a;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #27a578;
+    --series-4: #b06bd6;
+    --series-5: #d9527a;
+    --series-6: #a89a3a;
+    --border: rgba(255,255,255,0.10);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 14px 14px 10px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
+  .stat .v { font-size: 15px; font-weight: 600; }
+  .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .legend .key { width: 12px; height: 0; border-top: 2.5px solid; flex: none; }
+  .chart-wrap { position: relative; margin-top: 6px; }
+  svg { display: block; width: 100%; }
+  svg:focus { outline: 1.5px solid var(--series-1); outline-offset: 2px; border-radius: 2px; }
+  .tick-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .panel-title { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .base-line { stroke: var(--baseline); stroke-width: 1; }
+  .series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
+  .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .tooltip {
+    position: absolute; top: 0; left: 0; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 7px 10px; font-size: 12px;
+    min-width: 150px; z-index: 2;
+  }
+  .tooltip .t { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .tooltip .row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .tooltip .key { width: 10px; height: 0; border-top: 2px solid; flex: none; }
+  .tooltip .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .lab { color: var(--text-secondary); font-size: 11px; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Battery degradation</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div class="stats" id="stats" hidden></div>
+  <div class="legend" id="legend" hidden></div>
+  <div class="chart-wrap" id="chartWrap" hidden>
+    <svg id="chart" role="img" tabindex="0" aria-label="Battery degradation chart. Use arrow keys to inspect months."></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="state" id="state">Waiting for the degradation data…</div>
+  <details id="tableWrap" hidden>
+    <summary>Data table</summary>
+    <div id="tableBox" style="overflow-x:auto"></div>
+  </details>
+</div>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+});
+
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  capabilities: {},
+  clientInfo: { name: "teslamate-battery-degradation", version: "1.0.0" },
+  appCapabilities: { availableDisplayModes: ["inline"] },
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  notify("ui/notifications/initialized");
+  render();
+}).catch(() => { /* keep default theme; data may still arrive */ });
+
+/* ---------- data handling ---------- */
+let rows = [];
+let hoverIndex = -1;
+
+function onToolInput(args) {
+  const bits = [];
+  if (args && args.car_name) bits.push('cars matching "' + args.car_name + '"');
+  if (args && args.days) bits.push("last " + args.days + " days");
+  if (bits.length) setText("subtitle", bits.join(" · "));
+}
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the degradation data. " + text);
+    return;
+  }
+  const sc = result.structuredContent;
+  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  if (!rows.length) {
+    showState("No full-charge range samples found (the trend needs positions logged at 100%).");
+    return;
+  }
+  buildModel();
+  document.getElementById("state").hidden = true;
+  document.getElementById("stats").hidden = false;
+  document.getElementById("legend").hidden = false;
+  document.getElementById("chartWrap").hidden = false;
+  document.getElementById("tableWrap").hidden = false;
+  renderStats();
+  renderLegend();
+  renderTable();
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+
+/* ---------- model ---------- */
+let series = []; // {car, color, byMonth: Map<ms, {avg, max, n}>}
+let months = []; // Date[], sorted unique across all cars
+
+function parseUtc(s) {
+  if (typeof s !== "string") return null;
+  const iso = /(Z|[+-]\d\d:?\d\d)$/.test(s) ? s : s + "Z"; // TeslaMate stores naive UTC
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function buildModel() {
+  const byCar = new Map();
+  const monthSet = new Map();
+  for (const r of rows) {
+    const t = parseUtc(r.month);
+    if (!t || r.avg_rated_range == null) continue;
+    monthSet.set(t.getTime(), t);
+    if (!byCar.has(r.car_name)) byCar.set(r.car_name, new Map());
+    byCar.get(r.car_name).set(t.getTime(), {
+      avg: r.avg_rated_range, max: r.max_rated_range, n: r.data_points,
+    });
+  }
+  months = [...monthSet.values()].sort((a, b) => a - b);
+  series = [...byCar.entries()].map(([car, byMonth], i) => ({
+    car, byMonth, color: "var(--series-" + ((i % 6) + 1) + ")",
+  }));
+}
+
+/* Month values mark a calendar month (midnight in REPORT_TIMEZONE, stored
+   naive); format them in UTC so the label can never shift into the
+   neighbouring month for viewers west of UTC. */
+const monthFmt = new Intl.DateTimeFormat(undefined, {
+  month: "short", year: "numeric", timeZone: "UTC",
+});
+function fmtMonth(d) { return monthFmt.format(d); }
+
+function renderStats() {
+  const stats = [];
+  for (const s of series) {
+    const pts = months.filter((m) => s.byMonth.has(m.getTime()));
+    if (!pts.length) continue;
+    const first = s.byMonth.get(pts[0].getTime()).avg;
+    const latest = s.byMonth.get(pts[pts.length - 1].getTime()).avg;
+    const delta = latest - first;
+    const deltaTxt = pts.length > 1
+      ? " (" + (delta > 0 ? "+" : "") + delta.toFixed(1) + " km)" : "";
+    stats.push([latest.toFixed(1) + " km" + deltaTxt, s.car]);
+  }
+  stats.push([String(months.length), "Months"]);
+  const box = document.getElementById("stats");
+  box.replaceChildren(...stats.map(([v, l]) => {
+    const d = document.createElement("div");
+    d.className = "stat";
+    const dv = document.createElement("div"); dv.className = "v"; dv.textContent = v;
+    const dl = document.createElement("div"); dl.className = "l"; dl.textContent = l;
+    d.append(dv, dl);
+    return d;
+  }));
+  setText("subtitle", "Avg rated range at 100% charge · "
+    + fmtMonth(months[0]) + " – " + fmtMonth(months[months.length - 1]));
+}
+
+function renderLegend() {
+  const box = document.getElementById("legend");
+  box.replaceChildren(...series.map((s) => {
+    const item = document.createElement("div"); item.className = "item";
+    const key = document.createElement("span"); key.className = "key";
+    key.style.borderTopColor = s.color;
+    const lab = document.createElement("span"); lab.textContent = s.car;
+    item.append(key, lab);
+    return item;
+  }));
+}
+
+function renderTable() {
+  const cols = ["Month", "Car", "Avg km", "Best km", "Samples"];
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.append(...cols.map((label) => {
+    const th = document.createElement("th"); th.textContent = label; return th;
+  }));
+  thead.append(hr);
+  const tbody = document.createElement("tbody");
+  for (const s of series) {
+    for (const m of months) {
+      const p = s.byMonth.get(m.getTime());
+      if (!p) continue;
+      const tr = document.createElement("tr");
+      for (const v of [fmtMonth(m), s.car, p.avg, p.max == null ? "–" : p.max,
+                       p.n == null ? "–" : p.n]) {
+        const td = document.createElement("td");
+        td.textContent = String(v);
+        tr.append(td);
+      }
+      tbody.append(tr);
+    }
+  }
+  table.append(thead, tbody);
+  document.getElementById("tableBox").replaceChildren(table);
+}
+
+/* ---------- chart ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const M = { left: 46, right: 14, top: 18, xAxis: 22 };
+const PANEL_H = 190;
+let geom = null;
+
+function el(name, attrs) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+function niceTicks(min, max, count) {
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  const step0 = span / Math.max(1, count);
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
+  const lo = Math.floor(min / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= max + 1e-9; v += step) if (v >= min - 1e-9) ticks.push(+v.toFixed(6));
+  return ticks;
+}
+
+function render() {
+  if (!months.length) { reportSize(); return; }
+  const svg = document.getElementById("chart");
+  const width = Math.max(280, svg.parentElement.clientWidth || 280);
+  const height = M.top + PANEL_H + M.xAxis;
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("height", height);
+  svg.replaceChildren();
+
+  const t0 = months[0].getTime(), t1 = months[months.length - 1].getTime();
+  const plotW = width - M.left - M.right;
+  const x = (t) => M.left + (t1 === t0 ? plotW / 2 : ((t - t0) / (t1 - t0)) * plotW);
+
+  const vals = [];
+  for (const s of series) for (const p of s.byMonth.values()) vals.push(p.avg);
+  const pad = Math.max(2, (Math.max(...vals) - Math.min(...vals)) * 0.12);
+  const domain = [Math.min(...vals) - pad, Math.max(...vals) + pad];
+  const y = (v) => M.top + PANEL_H - ((v - domain[0]) / (domain[1] - domain[0])) * PANEL_H;
+  geom = { x, y, width, height };
+
+  const title = el("text", { x: M.left, y: M.top - 6, class: "panel-title" });
+  title.textContent = "Rated range at 100% (km)";
+  svg.append(title);
+  for (const tv of niceTicks(domain[0], domain[1], 5)) {
+    if (Math.abs(y(tv) - (M.top + PANEL_H)) > 4) { // baseline stands in for a bottom tick
+      svg.append(el("line", { x1: M.left, x2: width - M.right, y1: y(tv), y2: y(tv), class: "grid-line" }));
+    }
+    const lab = el("text", { x: M.left - 6, y: y(tv) + 3, "text-anchor": "end", class: "tick-label" });
+    lab.textContent = String(tv);
+    svg.append(lab);
+  }
+  svg.append(el("line", {
+    x1: M.left, x2: width - M.right, y1: M.top + PANEL_H, y2: M.top + PANEL_H, class: "base-line",
+  }));
+
+  for (const s of series) {
+    const pts = months.filter((m) => s.byMonth.has(m.getTime()));
+    const d = pts
+      .map((m, i) => (i ? "L" : "M") + x(m.getTime()).toFixed(1) + " "
+        + y(s.byMonth.get(m.getTime()).avg).toFixed(1))
+      .join(" ");
+    svg.append(el("path", { d, class: "series-line", stroke: s.color }));
+  }
+
+  const maxLabels = Math.max(2, Math.floor(plotW / 64));
+  const stride = Math.max(1, Math.ceil(months.length / maxLabels));
+  const lastX = x(months[months.length - 1].getTime());
+  months.forEach((m, i) => {
+    const isLast = i === months.length - 1;
+    // Stride labels yield to the (end-anchored) last label when they'd collide.
+    if (!isLast && (i % stride !== 0 || lastX - x(m.getTime()) < 90)) return;
+    const lab = el("text", {
+      x: x(m.getTime()), y: M.top + PANEL_H + 15,
+      "text-anchor": isLast ? "end" : "middle", class: "tick-label",
+    });
+    lab.textContent = fmtMonth(m);
+    svg.append(lab);
+  });
+
+  const hover = el("g", { id: "hoverLayer", style: "display:none" });
+  hover.append(el("line", { id: "crosshair", y1: M.top, y2: M.top + PANEL_H, class: "crosshair" }));
+  series.forEach((s, i) => {
+    hover.append(el("circle", { id: "dot-" + i, r: 4, fill: s.color, class: "hover-dot" }));
+  });
+  svg.append(hover);
+  bindPointer(svg);
+  if (hoverIndex >= 0) showHover(hoverIndex);
+  reportSize();
+}
+
+function bindPointer(svg) {
+  svg.onpointermove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * geom.width;
+    let best = 0, bestDist = Infinity;
+    months.forEach((m, i) => {
+      const d = Math.abs(geom.x(m.getTime()) - px);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    showHover(best);
+  };
+  svg.onpointerleave = () => hideHover();
+  svg.onkeydown = (ev) => {
+    const last = months.length - 1;
+    let i = hoverIndex < 0 ? 0 : hoverIndex;
+    if (ev.key === "ArrowRight") i = Math.min(last, i + 1);
+    else if (ev.key === "ArrowLeft") i = Math.max(0, i - 1);
+    else if (ev.key === "Home") i = 0;
+    else if (ev.key === "End") i = last;
+    else if (ev.key === "Escape") { hideHover(); return; }
+    else return;
+    ev.preventDefault();
+    showHover(i);
+  };
+}
+
+function showHover(i) {
+  hoverIndex = i;
+  const m = months[i];
+  const cx = geom.x(m.getTime());
+  const layer = document.getElementById("hoverLayer");
+  layer.style.display = "";
+  const cross = document.getElementById("crosshair");
+  cross.setAttribute("x1", cx); cross.setAttribute("x2", cx);
+  const tip = document.getElementById("tooltip");
+  tip.replaceChildren();
+  const t = document.createElement("div"); t.className = "t"; t.textContent = fmtMonth(m);
+  tip.append(t);
+  series.forEach((s, si) => {
+    const dot = document.getElementById("dot-" + si);
+    const p = s.byMonth.get(m.getTime());
+    if (!p) { dot.style.display = "none"; return; }
+    dot.style.display = "";
+    dot.setAttribute("cx", cx); dot.setAttribute("cy", geom.y(p.avg));
+    const row = document.createElement("div"); row.className = "row";
+    const key = document.createElement("span"); key.className = "key";
+    key.style.borderTopColor = s.color;
+    const v = document.createElement("span"); v.className = "val";
+    v.textContent = p.avg + " km";
+    const l = document.createElement("span"); l.className = "lab"; l.textContent = s.car;
+    row.append(key, v, l);
+    tip.append(row);
+  });
+  tip.style.display = "block";
+  const wrap = document.getElementById("chartWrap");
+  const svgEl = document.getElementById("chart");
+  const scale = svgEl.getBoundingClientRect().width / geom.width;
+  const pxLeft = cx * scale;
+  const flip = pxLeft > wrap.clientWidth - tip.offsetWidth - 20;
+  tip.style.left = (flip ? pxLeft - tip.offsetWidth - 10 : pxLeft + 10) + "px";
+  tip.style.top = "24px";
+}
+function hideHover() {
+  hoverIndex = -1;
+  document.getElementById("hoverLayer").style.display = "none";
+  document.getElementById("tooltip").style.display = "none";
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+new ResizeObserver(() => { if (months.length) render(); else reportSize(); })
+  .observe(document.getElementById("root"));
+document.getElementById("tableWrap").addEventListener("toggle", reportSize);
+</script>
+</body>
+</html>

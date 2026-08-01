@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Drive route</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --route: #2a78d6;
+    --marker-start: #1d8a63;
+    --marker-end: #c9375f;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --route: #3987e5;
+      --marker-start: #27a578;
+      --marker-end: #d9527a;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --route: #3987e5;
+    --marker-start: #27a578;
+    --marker-end: #d9527a;
+    --border: rgba(255,255,255,0.10);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 14px 14px 10px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
+  .stat .v { font-size: 15px; font-weight: 600; }
+  .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chart-wrap { position: relative; margin-top: 6px; }
+  svg { display: block; width: 100%; }
+  svg:focus { outline: 1.5px solid var(--route); outline-offset: 2px; border-radius: 2px; }
+  .tick-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .map-frame { fill: none; stroke: var(--grid); stroke-width: 1; }
+  .route-line { fill: none; stroke: var(--route); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .scale-line { stroke: var(--baseline); stroke-width: 2; }
+  .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .tooltip {
+    position: absolute; top: 0; left: 0; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 7px 10px; font-size: 12px;
+    min-width: 130px; z-index: 2;
+  }
+  .tooltip .t { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .tooltip .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 2px; }
+  .tooltip .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .lab { color: var(--text-secondary); font-size: 11px; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Drive route</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div class="stats" id="stats" hidden></div>
+  <div class="legend" id="legend" hidden>
+    <div class="item"><span class="dot" style="background:var(--marker-start)"></span>Start</div>
+    <div class="item"><span class="dot" style="background:var(--marker-end)"></span>End</div>
+  </div>
+  <div class="chart-wrap" id="chartWrap" hidden>
+    <svg id="chart" role="img" tabindex="0" aria-label="Drive route map. Use arrow keys to step along the track."></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="state" id="state">Waiting for the route data…</div>
+  <details id="tableWrap" hidden>
+    <summary>Waypoints</summary>
+    <div id="tableBox" style="overflow-x:auto"></div>
+  </details>
+</div>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+let hostTimeZone = null;
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+});
+
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  capabilities: {},
+  clientInfo: { name: "teslamate-drive-route", version: "1.0.0" },
+  appCapabilities: { availableDisplayModes: ["inline"] },
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  if (hc.timeZone) hostTimeZone = hc.timeZone;
+  notify("ui/notifications/initialized");
+  render();
+}).catch(() => { /* keep default theme; data may still arrive */ });
+
+/* ---------- data handling ---------- */
+let rows = [];
+let driveId = null;
+let hoverIndex = -1;
+
+function onToolInput(args) {
+  if (args && args.drive_id != null) {
+    driveId = args.drive_id;
+    setText("title", "Drive route · drive #" + driveId);
+  }
+}
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the route. " + text);
+    return;
+  }
+  const sc = result.structuredContent;
+  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  if (!rows.length) {
+    showState("No GPS positions recorded for this drive.");
+    return;
+  }
+  buildModel();
+  if (!points.length) {
+    showState("No GPS positions recorded for this drive.");
+    return;
+  }
+  document.getElementById("state").hidden = true;
+  document.getElementById("stats").hidden = false;
+  document.getElementById("legend").hidden = false;
+  document.getElementById("chartWrap").hidden = false;
+  document.getElementById("tableWrap").hidden = false;
+  renderStats();
+  renderTable();
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+
+/* ---------- model ---------- */
+let points = []; // {t, lat, lon, soc, speed, power, odo}
+
+function parseUtc(s) {
+  if (typeof s !== "string") return null;
+  const iso = /(Z|[+-]\d\d:?\d\d)$/.test(s) ? s : s + "Z"; // TeslaMate stores naive UTC
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function buildModel() {
+  points = rows.map((r) => ({
+    t: parseUtc(r.ts),
+    lat: r.latitude,
+    lon: r.longitude,
+    soc: r.battery_level,
+    speed: r.speed_max_kmh,
+    power: r.avg_power_kw,
+    odo: r.odometer_km,
+  })).filter((p) => p.lat != null && p.lon != null);
+}
+
+const timeFmt = () => new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit", minute: "2-digit", ...(hostTimeZone ? { timeZone: hostTimeZone } : {}),
+});
+function fmtTime(d) { return d ? timeFmt().format(d) : "–"; }
+function fmtDur(ms) {
+  const m = Math.round(ms / 60000);
+  return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min";
+}
+
+function renderStats() {
+  const first = points[0], last = points[points.length - 1];
+  const odos = points.map((p) => p.odo).filter((v) => v != null);
+  const speeds = points.map((p) => p.speed).filter((v) => v != null);
+  const stats = [];
+  if (odos.length > 1) {
+    stats.push([(Math.max(...odos) - Math.min(...odos)).toFixed(1) + " km", "Distance"]);
+  }
+  if (first.t && last.t) stats.push([fmtDur(last.t - first.t), "Duration"]);
+  if (first.soc != null && last.soc != null) {
+    stats.push([first.soc + "% → " + last.soc + "%", "Battery level"]);
+  }
+  if (speeds.length) stats.push([Math.max(...speeds) + " km/h", "Top speed"]);
+  const box = document.getElementById("stats");
+  box.replaceChildren(...stats.map(([v, l]) => {
+    const d = document.createElement("div");
+    d.className = "stat";
+    const dv = document.createElement("div"); dv.className = "v"; dv.textContent = v;
+    const dl = document.createElement("div"); dl.className = "l"; dl.textContent = l;
+    d.append(dv, dl);
+    return d;
+  }));
+  setText("subtitle", fmtTime(first.t) + " – " + fmtTime(last.t)
+    + " · " + points.length + " track points");
+}
+
+function renderTable() {
+  const cols = [
+    ["point_order", "#"], ["ts", "Time"], ["battery_level", "Battery %"],
+    ["speed_max_kmh", "Max km/h"], ["avg_power_kw", "Avg kW"], ["odometer_km", "Odometer km"],
+  ];
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.append(...cols.map(([, label]) => {
+    const th = document.createElement("th"); th.textContent = label; return th;
+  }));
+  thead.append(hr);
+  const tbody = document.createElement("tbody");
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.append(...cols.map(([key]) => {
+      const td = document.createElement("td");
+      const v = r[key];
+      td.textContent = key === "ts" ? fmtTime(parseUtc(v)) : (v == null ? "–" : String(v));
+      return td;
+    }));
+    tbody.append(tr);
+  });
+  table.append(thead, tbody);
+  document.getElementById("tableBox").replaceChildren(table);
+}
+
+/* ---------- map ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const M = { pad: 18 };
+const KM_PER_DEG_LAT = 111.32;
+let geom = null;
+
+function el(name, attrs) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+
+function render() {
+  if (!points.length) { reportSize(); return; }
+  const svg = document.getElementById("chart");
+  const width = Math.max(280, svg.parentElement.clientWidth || 280);
+
+  // Equirectangular projection: scale longitude by cos(mid-latitude) so the
+  // track keeps its real-world aspect ratio, then fit it into the viewport.
+  const lats = points.map((p) => p.lat), lons = points.map((p) => p.lon);
+  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+  const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
+  const cosMid = Math.max(0.05, Math.cos(((latMin + latMax) / 2) * Math.PI / 180));
+  const spanX = Math.max((lonMax - lonMin) * cosMid, 1e-6);
+  const spanY = Math.max(latMax - latMin, 1e-6);
+
+  const plotW = width - 2 * M.pad;
+  const height = Math.round(Math.min(340, Math.max(180, plotW * (spanY / spanX))) + 2 * M.pad);
+  const plotH = height - 2 * M.pad;
+  const scale = Math.min(plotW / spanX, plotH / spanY);
+  const offX = M.pad + (plotW - spanX * scale) / 2;
+  const offY = M.pad + (plotH - spanY * scale) / 2;
+  const x = (lon) => offX + (lon - lonMin) * cosMid * scale;
+  const y = (lat) => offY + (latMax - lat) * scale;
+  geom = { x, y, width, height };
+
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("height", height);
+  svg.replaceChildren();
+  svg.append(el("rect", {
+    x: 0.5, y: 0.5, width: width - 1, height: height - 1, rx: 6, class: "map-frame",
+  }));
+
+  const d = points
+    .map((p, i) => (i ? "L" : "M") + x(p.lon).toFixed(1) + " " + y(p.lat).toFixed(1))
+    .join(" ");
+  svg.append(el("path", { d, class: "route-line" }));
+
+  const start = points[0], end = points[points.length - 1];
+  svg.append(el("circle", {
+    cx: x(start.lon), cy: y(start.lat), r: 5, fill: "var(--marker-start)", class: "hover-dot",
+  }));
+  svg.append(el("circle", {
+    cx: x(end.lon), cy: y(end.lat), r: 5, fill: "var(--marker-end)", class: "hover-dot",
+  }));
+
+  // Scale bar: pick a round distance that spans at most ~30% of the width.
+  const kmPerPx = 1 / (scale / KM_PER_DEG_LAT);
+  const targetKm = kmPerPx * plotW * 0.3;
+  const niceKm = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200]
+    .filter((v) => v <= targetKm).pop() || 0.1;
+  const barPx = niceKm / kmPerPx;
+  const barY = height - M.pad + 6;
+  svg.append(el("line", {
+    x1: M.pad, x2: M.pad + barPx, y1: barY, y2: barY, class: "scale-line",
+  }));
+  const barLab = el("text", { x: M.pad + barPx + 6, y: barY + 3, class: "tick-label" });
+  barLab.textContent = niceKm < 1 ? niceKm * 1000 + " m" : niceKm + " km";
+  svg.append(barLab);
+
+  const hover = el("g", { id: "hoverLayer", style: "display:none" });
+  hover.append(el("circle", { id: "hoverDot", r: 4.5, fill: "var(--route)", class: "hover-dot" }));
+  svg.append(hover);
+  bindPointer(svg);
+  if (hoverIndex >= 0) showHover(hoverIndex);
+  reportSize();
+}
+
+function bindPointer(svg) {
+  svg.onpointermove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * geom.width;
+    const py = ((ev.clientY - rect.top) / rect.height) * geom.height;
+    let best = 0, bestDist = Infinity;
+    points.forEach((p, i) => {
+      const dx = geom.x(p.lon) - px, dy = geom.y(p.lat) - py;
+      const d = dx * dx + dy * dy;
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    showHover(best);
+  };
+  svg.onpointerleave = () => hideHover();
+  svg.onkeydown = (ev) => {
+    const last = points.length - 1;
+    let i = hoverIndex < 0 ? 0 : hoverIndex;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown") i = Math.min(last, i + 1);
+    else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") i = Math.max(0, i - 1);
+    else if (ev.key === "Home") i = 0;
+    else if (ev.key === "End") i = last;
+    else if (ev.key === "Escape") { hideHover(); return; }
+    else return;
+    ev.preventDefault();
+    showHover(i);
+  };
+}
+
+function showHover(i) {
+  hoverIndex = i;
+  const p = points[i];
+  const cx = geom.x(p.lon), cy = geom.y(p.lat);
+  const layer = document.getElementById("hoverLayer");
+  layer.style.display = "";
+  const dot = document.getElementById("hoverDot");
+  dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+  const tip = document.getElementById("tooltip");
+  tip.replaceChildren();
+  const t = document.createElement("div"); t.className = "t";
+  t.textContent = fmtTime(p.t) + " · point " + (i + 1) + "/" + points.length;
+  tip.append(t);
+  const rowsData = [
+    [p.speed != null ? p.speed + " km/h" : "–", "Max speed"],
+    [p.soc != null ? p.soc + "%" : "–", "Battery"],
+    [p.power != null ? p.power + " kW" : "–", "Avg power"],
+  ];
+  for (const [val, lab] of rowsData) {
+    const row = document.createElement("div"); row.className = "row";
+    const l = document.createElement("span"); l.className = "lab"; l.textContent = lab;
+    const v = document.createElement("span"); v.className = "val"; v.textContent = val;
+    row.append(l, v);
+    tip.append(row);
+  }
+  tip.style.display = "block";
+  const wrap = document.getElementById("chartWrap");
+  const svgEl = document.getElementById("chart");
+  const scalePx = svgEl.getBoundingClientRect().width / geom.width;
+  const pxLeft = cx * scalePx, pxTop = cy * scalePx;
+  const flip = pxLeft > wrap.clientWidth - tip.offsetWidth - 20;
+  tip.style.left = (flip ? pxLeft - tip.offsetWidth - 10 : pxLeft + 10) + "px";
+  tip.style.top = Math.max(4, pxTop - tip.offsetHeight - 10) + "px";
+}
+function hideHover() {
+  hoverIndex = -1;
+  document.getElementById("hoverLayer").style.display = "none";
+  document.getElementById("tooltip").style.display = "none";
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+new ResizeObserver(() => { if (points.length) render(); else reportSize(); })
+  .observe(document.getElementById("root"));
+document.getElementById("tableWrap").addEventListener("toggle", reportSize);
+</script>
+</body>
+</html>

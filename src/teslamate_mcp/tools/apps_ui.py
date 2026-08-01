@@ -1,30 +1,98 @@
 """MCP Apps extension: interactive charts rendered in-conversation.
 
-Pilot app: `show_charging_curve` binds the bundled charging_curve.sql query to
-a self-contained HTML chart (`ui://teslamate/charging-curve.html`) that the
-host renders in a sandboxed iframe (ext-apps spec 2026-01-26). Per SEP-2133
-the tool degrades gracefully: it returns the same rows as `get_charging_curve`,
-so clients that did not negotiate the Apps extension still get the data.
+Each `AppSpec` binds a bundled query to a self-contained HTML app
+(ext-apps spec 2026-01-26) that the host renders in a sandboxed iframe.
+Per SEP-2133 every app tool degrades gracefully: it returns the same rows
+as its backing `get_*` query tool, so clients that did not negotiate the
+Apps extension still get the data.
 """
 
 from __future__ import annotations
 
-import logging
+from dataclasses import dataclass
 from importlib.resources import files
-from typing import Any
 
 from mcp import types
 from mcp.server.apps import APP_MIME_TYPE, Apps
-from mcp.server.mcpserver import Context
 from mcp.types import ToolAnnotations
-from pydantic import Field
 
-from ..db import fetch_all
-from .registry import PredefinedTool, build_row_model
+from .registry import PredefinedTool, make_query_handler
 
-logger = logging.getLogger(__name__)
 
-CHARGING_CURVE_APP_URI = "ui://teslamate/charging-curve.html"
+@dataclass(frozen=True)
+class AppSpec:
+    """One UI-bound tool: a bundled query rendered by a bundled HTML app."""
+
+    tool_name: str
+    query_name: str
+    uri: str
+    html_file: str
+    resource_name: str
+    resource_title: str
+    resource_description: str
+    tool_description: str
+
+
+APP_SPECS: tuple[AppSpec, ...] = (
+    AppSpec(
+        tool_name="show_charging_curve",
+        query_name="get_charging_curve",
+        uri="ui://teslamate/charging-curve.html",
+        html_file="charging_curve.html",
+        resource_name="charging_curve_chart",
+        resource_title="Charging curve chart",
+        resource_description=(
+            "Interactive battery-level and charging-power chart for one session."
+        ),
+        tool_description=(
+            "Render an interactive charging-curve chart for one charging session, "
+            "displayed directly in the conversation (battery level and charging "
+            "power over time, with hover readouts and a data table). Returns the "
+            "same rows as get_charging_curve, so it also works as a plain data "
+            "tool. Prefer this over get_charging_curve when the user wants to SEE "
+            "the curve. Find session ids with search_charging_sessions."
+        ),
+    ),
+    AppSpec(
+        tool_name="show_battery_degradation",
+        query_name="get_battery_degradation_over_time",
+        uri="ui://teslamate/battery-degradation.html",
+        html_file="battery_degradation.html",
+        resource_name="battery_degradation_chart",
+        resource_title="Battery degradation chart",
+        resource_description=("Interactive monthly rated-range trend chart, one line per car."),
+        tool_description=(
+            "Render an interactive battery-degradation trend chart, displayed "
+            "directly in the conversation (monthly average and best rated range "
+            "at full charge, one line per car, with hover readouts and a data "
+            "table). Returns the same rows as get_battery_degradation_over_time, "
+            "so it also works as a plain data tool. Prefer this over "
+            "get_battery_degradation_over_time when the user wants to SEE the "
+            "trend."
+        ),
+    ),
+    AppSpec(
+        tool_name="show_drive_route",
+        query_name="get_drive_route",
+        uri="ui://teslamate/drive-route.html",
+        html_file="drive_route.html",
+        resource_name="drive_route_map",
+        resource_title="Drive route map",
+        resource_description=(
+            "Interactive GPS route map with speed and battery readouts for one drive."
+        ),
+        tool_description=(
+            "Render an interactive route map for one drive, displayed directly "
+            "in the conversation (the GPS track with start/end markers, hover "
+            "readouts for time, speed, and battery, and a waypoint table). "
+            "Returns the same rows as get_drive_route, so it also works as a "
+            "plain data tool. Prefer this over get_drive_route when the user "
+            "wants to SEE the route. Find drive ids with search_drives."
+        ),
+    ),
+)
+
+CHARGING_CURVE_APP_URI = APP_SPECS[0].uri
 
 
 class ResourceLinkedApps(Apps):
@@ -57,19 +125,14 @@ def _load_app_html(filename: str) -> str:
     return files("teslamate_mcp").joinpath("apps", filename).read_text(encoding="utf-8")
 
 
-def build_apps_extension(tools: list[PredefinedTool]) -> Apps:
+def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -> Apps:
     """Build the Apps extension; pass the result to MCPServer(extensions=[...]).
 
-    Reuses the bundled charging_curve.sql so the chart and the plain
-    `get_charging_curve` tool can never drift apart.
+    Each app tool reuses its backing query via make_query_handler, so the
+    chart and the plain `get_*` tool can never drift apart (same params,
+    same tz injection, same typed output schema).
     """
-    try:
-        curve = next(t for t in tools if t.name == "get_charging_curve")
-    except StopIteration:  # fail fast, like a missing .toml sidecar
-        raise RuntimeError(
-            "MCP Apps: bundled query 'get_charging_curve' not found; "
-            "charging_curve.sql/.toml must exist in queries/"
-        ) from None
+    by_name = {t.name: t for t in tools}
 
     apps = ResourceLinkedApps()
 
@@ -80,60 +143,28 @@ def build_apps_extension(tools: list[PredefinedTool]) -> Apps:
         open_world_hint=False,
     )
 
-    description = (
-        "Render an interactive charging-curve chart for one charging session, "
-        "displayed directly in the conversation (battery level and charging "
-        "power over time, with hover readouts and a data table). Returns the "
-        "same rows as get_charging_curve, so it also works as a plain data "
-        "tool. Prefer this over get_charging_curve when the user wants to SEE "
-        "the curve. Find session ids with search_charging_sessions."
-    )
-
-    @apps.tool(
-        resource_uri=CHARGING_CURVE_APP_URI,
-        name="show_charging_curve",
-        description=description,
-        annotations=annotations,
-    )
-    async def show_charging_curve(
-        ctx: Context,
-        charging_process_id: int = Field(
-            ...,
-            description="The charging session's id, as returned by search_charging_sessions.",
-        ),
-        max_points: int = Field(
-            120,
-            ge=10,
-            le=1000,
-            description="Maximum number of curve points (time buckets) to return.",
-        ),
-    ) -> list[dict[str, Any]]:
-        pool = ctx.request_context.lifespan_context.pool
-        logger.info(
-            "show_charging_curve rendering session %d (max_points=%d)",
-            charging_process_id,
-            max_points,
+    for spec in APP_SPECS:
+        query = by_name.get(spec.query_name)
+        if query is None:  # fail fast, like a missing .toml sidecar
+            raise RuntimeError(
+                f"MCP Apps: bundled query '{spec.query_name}' not found; "
+                f"required by {spec.tool_name} — its .sql/.toml must exist in queries/"
+            )
+        handler = make_query_handler(query, report_timezone=report_timezone)
+        handler.__name__ = spec.tool_name
+        handler.__doc__ = spec.tool_description
+        apps.tool(
+            resource_uri=spec.uri,
+            name=spec.tool_name,
+            description=spec.tool_description,
+            annotations=annotations,
+        )(handler)
+        apps.add_html_resource(
+            spec.uri,
+            _load_app_html(spec.html_file),
+            name=spec.resource_name,
+            title=spec.resource_title,
+            description=spec.resource_description,
+            prefers_border=True,
         )
-        rows = await fetch_all(
-            pool,
-            curve.sql,
-            {"charging_process_id": charging_process_id, "max_points": max_points},
-        )
-        logger.info("show_charging_curve returned %d point(s)", len(rows))
-        return rows
-
-    show_charging_curve.__annotations__["ctx"] = Context
-    # Share the curve tool's [[output]] declaration so both tools advertise
-    # the same typed outputSchema.
-    row_model = build_row_model(curve)
-    if row_model is not None:
-        show_charging_curve.__annotations__["return"] = list[row_model]
-    apps.add_html_resource(
-        CHARGING_CURVE_APP_URI,
-        _load_app_html("charging_curve.html"),
-        name="charging_curve_chart",
-        title="Charging curve chart",
-        description="Interactive battery-level and charging-power chart for one session.",
-        prefers_border=True,
-    )
     return apps

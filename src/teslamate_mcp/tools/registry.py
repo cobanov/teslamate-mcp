@@ -342,33 +342,17 @@ def _build_signature(tool: PredefinedTool) -> inspect.Signature:
     return inspect.Signature(parameters, return_annotation=return_annotation)
 
 
-def register_predefined_tools(
-    mcp: MCPServer, tools: list[PredefinedTool], *, report_timezone: str
-) -> None:
-    """Attach each predefined tool to the MCP server.
+def make_query_handler(tool: PredefinedTool, *, report_timezone: str) -> Any:
+    """Build the async handler for one predefined query, ready to register.
 
-    A small factory captures the SQL per tool so the registered coroutine
-    closes over only its own query — without a factory, every registered
-    coroutine would share the loop variable and run the same SQL.
+    Shared by the plain tool registry and the MCP Apps extension so a
+    UI-bound tool can never drift from its backing query: same typed
+    signature, same tz injection, same [[output]]-derived return type.
+    Acting as a per-tool factory also keeps each coroutine closed over only
+    its own query — without it, handlers in a registration loop would share
+    the loop variable and run the same SQL.
     """
-    annotations = ToolAnnotations(
-        read_only_hint=True,
-        destructive_hint=False,
-        idempotent_hint=True,
-        open_world_hint=False,
-    )
 
-    for tool in tools:
-        _register_one(mcp, tool, annotations, report_timezone=report_timezone)
-
-
-def _register_one(
-    mcp: MCPServer,
-    tool: PredefinedTool,
-    annotations: ToolAnnotations,
-    *,
-    report_timezone: str,
-) -> None:
     async def handler(ctx: Context, **params: Any) -> list[dict[str, Any]]:
         pool = ctx.request_context.lifespan_context.pool
         bound = {p.name: params.get(p.name, p.default) for p in tool.params}
@@ -386,4 +370,20 @@ def _register_one(
     # the SDK introspects — it both excludes ctx from the client-facing schema
     # and surfaces the declared params with types, defaults, and constraints.
     handler.__signature__ = _build_signature(tool)  # type: ignore[attr-defined]
-    mcp.tool(name=tool.name, description=tool.description, annotations=annotations)(handler)
+    return handler
+
+
+def register_predefined_tools(
+    mcp: MCPServer, tools: list[PredefinedTool], *, report_timezone: str
+) -> None:
+    """Attach each predefined tool to the MCP server."""
+    annotations = ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+
+    for tool in tools:
+        handler = make_query_handler(tool, report_timezone=report_timezone)
+        mcp.tool(name=tool.name, description=tool.description, annotations=annotations)(handler)

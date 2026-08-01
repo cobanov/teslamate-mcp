@@ -25,7 +25,7 @@ from .tools import (
     register_predefined_tools,
     register_schema_tool,
 )
-from .tools.apps_ui import build_apps_extension
+from .tools.apps_ui import APP_SPECS, build_apps_extension
 
 logger = logging.getLogger(__name__)
 
@@ -90,10 +90,10 @@ def create_server(settings: Settings) -> MCPServer:
         lifespan=lifespan,
         debug=settings.debug,
         cache_hints=_CACHE_HINTS,
-        # MCP Apps (io.modelcontextprotocol/ui): show_charging_curve + its
-        # ui:// chart resource. Degrades to a plain data tool on clients
-        # that did not negotiate the extension.
-        extensions=[build_apps_extension(tools)],
+        # MCP Apps (io.modelcontextprotocol/ui): one show_* tool + ui://
+        # resource per APP_SPECS entry. Each degrades to a plain data tool
+        # on clients that did not negotiate the extension.
+        extensions=[build_apps_extension(tools, report_timezone=settings.report_timezone)],
     )
 
     register_predefined_tools(mcp, tools, report_timezone=settings.report_timezone)
@@ -109,8 +109,9 @@ def create_server(settings: Settings) -> MCPServer:
     register_prompts(mcp)
     logger.info(
         "Registered %d predefined tools + run_sql + get_database_schema + "
-        "show_charging_curve (MCP Apps)%s + resources + prompts",
+        "%s (MCP Apps)%s + resources + prompts",
         len(tools),
+        "/".join(spec.tool_name for spec in APP_SPECS),
         " + set_charging_cost (writes ENABLED)" if settings.enable_charging_writes else "",
     )
 

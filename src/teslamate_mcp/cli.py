@@ -18,6 +18,7 @@ from .config import load_settings
 from .server import create_server
 from .telemetry import configure_telemetry
 from .tools import discover_predefined_tools
+from .tools.apps_ui import APP_SPECS
 
 
 async def _health(_request: Request) -> JSONResponse:
@@ -153,7 +154,10 @@ def list_tools_cmd() -> None:
         click.echo(f"{tool.name:<45} {tool.source}  ({params})")
     click.echo(f"{'get_database_schema':<45} (built-in)  (table)")
     click.echo(f"{'run_sql':<45} (built-in)  (query)")
-    click.echo(f"{'show_charging_curve':<45} (MCP App)   (charging_process_id, max_points)")
+    by_name = {t.name: t for t in tools}
+    for spec in APP_SPECS:
+        params = ", ".join(p.name for p in by_name[spec.query_name].params) or "no params"
+        click.echo(f"{spec.tool_name:<45} (MCP App)   ({params})")
 
 
 if __name__ == "__main__":  # pragma: no cover
