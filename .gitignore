@@ -1,3 +1,6 @@
+# Internal docs with real deployment values — never committed
+docs_internal/
+
 # Python-generated files
 __pycache__/
 *.py[oc]

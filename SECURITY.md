@@ -4,8 +4,8 @@
 
 If you believe you have found a security vulnerability in `teslamate-mcp`, please **do not** open a public GitHub issue. Instead, report it privately so it can be addressed before disclosure.
 
-- Open a [private security advisory](https://github.com/cobanov/teslamate-mcp/security/advisories/new) on GitHub, **or**
-- Email the maintainer at <mertcobanov@gmail.com>.
+- Open a [private security advisory](https://github.com/batubozkan/teslamate-mcp/security/advisories/new) on GitHub.
+- For issues that also affect the upstream project, report there as well: [cobanov/teslamate-mcp advisories](https://github.com/cobanov/teslamate-mcp/security/advisories/new).
 
 When reporting, please include:
 

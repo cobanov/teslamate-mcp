@@ -1,18 +1,18 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>teslamate-mcp</Name>
-  <Repository>ghcr.io/cobanov/teslamate-mcp:latest</Repository>
-  <Registry>https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp</Registry>
+  <Repository>ghcr.io/batubozkan/teslamate-mcp:latest</Repository>
+  <Registry>https://github.com/batubozkan/teslamate-mcp/pkgs/container/teslamate-mcp</Registry>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/cobanov/teslamate-mcp/issues</Support>
-  <Project>https://github.com/cobanov/teslamate-mcp</Project>
+  <Support>https://github.com/batubozkan/teslamate-mcp/issues</Support>
+  <Project>https://github.com/batubozkan/teslamate-mcp</Project>
   <Overview>
     Model Context Protocol (MCP) server that exposes your TeslaMate PostgreSQL database
     to AI assistants (Claude, Cursor, ...) over streamable HTTP.
-    20 tools (18 predefined analytics queries + run_sql + get_database_schema),
-    6 prompts, 2 resources.
+    35 tools (30 predefined analytics queries + run_sql + get_database_schema +
+    3 interactive MCP Apps charts), 6 prompts, resources.
 
     Requires a running TeslaMate + PostgreSQL stack.
     Endpoint: http://[IP]:[PORT:8888]/mcp - Health: http://[IP]:[PORT:8888]/health

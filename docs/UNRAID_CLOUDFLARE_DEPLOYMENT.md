@@ -31,13 +31,15 @@ Why this shape:
   sandboxed server-side (Postgres `READ ONLY` transaction + forced rollback); use a
   SELECT-only DB role for a final layer.
 
-## Values used in this deployment
+## Example values used throughout this guide
 
-| Value | Meaning |
+Substitute your own values wherever these appear:
+
+| Placeholder | Meaning |
 |---|---|
 | `your-domain.com` | Domain active on Cloudflare |
 | `192.168.1.100` | LAN IP of the Unraid server |
-| `<AUTH_TOKEN>` | Bearer token generated in Phase 1 (kept out of this file) |
+| `<AUTH_TOKEN>` | Bearer token generated in Phase 1 (never written to disk/docs) |
 | `you@example.com` | Email allowed by the Access policy |
 
 ## Prerequisites
