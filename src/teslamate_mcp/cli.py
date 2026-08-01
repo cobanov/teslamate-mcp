@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
 import sys
+from collections.abc import Awaitable, Callable
 
 import click
 import uvicorn
+from mcp.server.mcpserver import MCPServer
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -15,15 +18,43 @@ from starlette.routing import Route
 from . import __version__
 from .auth import BearerAuthMiddleware
 from .config import load_settings
-from .server import create_server
+from .server import app_context_for, create_server
 from .telemetry import configure_telemetry
 from .tools import discover_predefined_tools
 from .tools.apps_ui import APP_SPECS
 
+# Kept well under the Dockerfile HEALTHCHECK timeout so the probe answers
+# rather than being killed mid-flight.
+_HEALTH_DB_TIMEOUT_S = 3.0
 
-async def _health(_request: Request) -> JSONResponse:
-    """Liveness probe used by Docker HEALTHCHECK and any external monitor."""
-    return JSONResponse({"status": "ok", "version": __version__})
+
+def _make_health(server: MCPServer) -> Callable[[Request], Awaitable[JSONResponse]]:
+    """Build the /health handler bound to this server's connection pool."""
+
+    async def _health(_request: Request) -> JSONResponse:
+        """Readiness probe for the Docker HEALTHCHECK and any external monitor.
+
+        This checks the database, not just the event loop. A liveness-only
+        probe reported `ok` while every MCP call failed with a 500 because the
+        pool could not reach PostgreSQL — the container looked healthy while
+        being entirely unable to serve.
+        """
+        body: dict[str, object] = {"status": "ok", "version": __version__, "database": "ok"}
+        context = app_context_for(server)
+        if context is None or context.pool.closed:
+            body |= {"status": "degraded", "database": "unavailable"}
+            return JSONResponse(body, status_code=503)
+        try:
+            async with asyncio.timeout(_HEALTH_DB_TIMEOUT_S):
+                async with context.pool.connection() as conn:
+                    await conn.execute("SELECT 1")
+        except Exception as exc:  # any failure here means "not serving"
+            detail = str(exc).strip().splitlines()[0] or type(exc).__name__
+            body |= {"status": "degraded", "database": "unreachable", "detail": detail[:200]}
+            return JSONResponse(body, status_code=503)
+        return JSONResponse(body)
+
+    return _health
 
 
 class NormalizeMcpPathMiddleware:
@@ -123,7 +154,7 @@ def http(
         stateless_http=stateless,
         host=settings.host,
     )
-    app.router.routes.append(Route("/health", _health, methods=["GET"]))
+    app.router.routes.append(Route("/health", _make_health(mcp), methods=["GET"]))
     app.add_middleware(NormalizeMcpPathMiddleware)
 
     token = settings.auth_token.get_secret_value() if settings.auth_token else ""

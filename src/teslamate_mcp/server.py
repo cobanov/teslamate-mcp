@@ -51,6 +51,15 @@ class AppContext:
     schema: list[dict[str, Any]] | None = field(default=None)
 
 
+def app_context_for(server: MCPServer) -> AppContext | None:
+    """The lifespan state of `server`, typed, for callers outside the request path.
+
+    Tools reach their AppContext through the MCP request context; the /health
+    route runs outside any MCP request and still needs the pool.
+    """
+    return getattr(server, "teslamate_app_context", None)
+
+
 def create_server(settings: Settings) -> MCPServer:
     """Build the MCPServer, wire up the lifespan, and register all tools."""
 

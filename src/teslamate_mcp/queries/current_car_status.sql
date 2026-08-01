@@ -1,3 +1,6 @@
+-- Latest position per car via a LATERAL top-1; see battery_health_summary.sql
+-- for why the correlated MAX(date) subquery this replaces could not complete
+-- on a large positions table.
 SELECT c.name as car_name,
     p.battery_level,
     p.rated_battery_range_km,
@@ -10,8 +13,14 @@ SELECT c.name as car_name,
     a.city,
     a.state,
     p.date as last_update
-FROM positions p
-    JOIN cars c ON p.car_id = c.id
+FROM cars c
+    CROSS JOIN LATERAL (
+        SELECT *
+        FROM positions p
+        WHERE p.car_id = c.id
+        ORDER BY p.date DESC
+        LIMIT 1
+    ) p
     LEFT JOIN LATERAL (
         SELECT *
         FROM addresses a
@@ -20,9 +29,4 @@ FROM positions p
             )
         LIMIT 1
     ) a ON true
-WHERE p.date = (
-        SELECT MAX(date)
-        FROM positions p2
-        WHERE p2.car_id = p.car_id
-    )
-    AND (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%');
+WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%');

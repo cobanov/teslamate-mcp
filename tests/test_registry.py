@@ -35,11 +35,17 @@ def test_discover_finds_all_bundled_tools() -> None:
     assert "get_drive_route" in names
 
 
+def _first_statement_keyword(sql: str) -> str:
+    """The SQL text with any leading `--` header comment stripped."""
+    lines = [line for line in sql.strip().splitlines() if not line.lstrip().startswith("--")]
+    return "\n".join(lines).strip().upper()
+
+
 def test_each_tool_has_nonempty_metadata() -> None:
     for tool in discover_predefined_tools():
         assert tool.name.startswith(("get_", "search_"))
         assert len(tool.description) > 20
-        assert tool.sql.strip().upper().startswith(("SELECT", "WITH"))
+        assert _first_statement_keyword(tool.sql).startswith(("SELECT", "WITH"))
 
 
 def test_every_tool_accepts_a_car_scope_or_is_id_scoped() -> None:
