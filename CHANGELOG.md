@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-01
+
+### Fixed
+- **Visible "Resource links are not currently supported" noise in Claude
+  Desktop** on every `show_*` app tool result. 0.8.0 prepended a result-level
+  `resource_link` block as a second chart-rendering signal; it never triggered
+  rendering, and newer Claude Desktop builds surface an unsupported-notice for
+  the block instead of silently ignoring it. App tools now rely solely on the
+  spec's tool-level `_meta.ui.resourceUri` binding — results are link-free
+  again (regression-tested).
+
 ## [0.9.0] - 2026-08-01
 
 ### Added

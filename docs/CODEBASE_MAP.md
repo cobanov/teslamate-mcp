@@ -263,9 +263,10 @@ query is missing). Each spec binds a fully self-contained HTML app (`text/html;p
 fetches) that speaks the postMessage handshake (`ui/initialize` → `ui/notifications/initialized` → renders on
 `ui/notifications/tool-result`), draws SVG (stacked curve panels / multi-car trend lines / an equirectangular
 route map with scale bar), follows host theme, and reports `ui/notifications/size-changed`. **Degrades
-gracefully**: non-Apps clients get the rows as plain structured content. `ResourceLinkedApps` (0.8.0+)
-additionally prepends a `resource_link` content block to UI-bound tool results via `intercept_tool_call` —
-Claude's connector implementation keys rendering off the result-level link.
+gracefully**: non-Apps clients get the rows as plain structured content. The UI binding is tool-level
+`_meta.ui.resourceUri` **only** — 0.8.0 also prepended a result-level `resource_link` block, but Claude
+Desktop renders a visible "Resource links are not currently supported" notice for it, so 0.9.1 removed it
+(regression-tested in `test_apps_ui.py`; do not re-add).
 `telemetry.py` (0.8.0+) wires an OTLP/HTTP span exporter for the SDK's built-in OTel spans when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set; no-op otherwise.
 

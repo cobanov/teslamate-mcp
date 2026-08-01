@@ -12,8 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from importlib.resources import files
 
-from mcp import types
-from mcp.server.apps import APP_MIME_TYPE, Apps
+from mcp.server.apps import Apps
 from mcp.types import ToolAnnotations
 
 from .registry import PredefinedTool, make_query_handler
@@ -95,30 +94,12 @@ APP_SPECS: tuple[AppSpec, ...] = (
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri
 
 
-class ResourceLinkedApps(Apps):
-    """Apps variant that also embeds a resource_link block in tool results.
-
-    The ext-apps spec binds a tool to its UI via tool `_meta.ui` only, but
-    Claude's connector implementation documents the interactive pattern as the
-    result carrying "structuredContent and a resource link". Prepending the
-    link is spec-harmless (non-UI clients ignore the extra block) and gives
-    renderers that key off the result a second signal.
-    """
-
-    async def intercept_tool_call(self, params, ctx, call_next):  # type: ignore[override]
-        result = await call_next(ctx)
-        uri = next((u for b, u in self._tools if b.kwargs.get("name") == params.name), None)
-        if uri is not None and isinstance(result, types.CallToolResult):
-            result.content.insert(
-                0,
-                types.ResourceLink(
-                    type="resource_link",
-                    uri=uri,
-                    name=uri.rsplit("/", 1)[-1],
-                    mime_type=APP_MIME_TYPE,
-                ),
-            )
-        return result
+# History (0.8.0 → 0.9.1): a ResourceLinkedApps subclass used to prepend a
+# result-level `resource_link` block as a second rendering signal. It never
+# triggered chart rendering, and newer Claude Desktop builds surface a visible
+# "Resource links are not currently supported" notice for the block instead of
+# ignoring it — so app tools now rely solely on the spec's tool-level
+# `_meta.ui.resourceUri` binding. Do not re-add the result-level link.
 
 
 def _load_app_html(filename: str) -> str:
@@ -134,7 +115,7 @@ def build_apps_extension(tools: list[PredefinedTool], *, report_timezone: str) -
     """
     by_name = {t.name: t for t in tools}
 
-    apps = ResourceLinkedApps()
+    apps = Apps()
 
     annotations = ToolAnnotations(
         read_only_hint=True,

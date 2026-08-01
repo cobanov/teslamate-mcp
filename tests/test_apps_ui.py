@@ -113,19 +113,18 @@ async def test_app_tools_match_their_plain_tools(mcp_session) -> None:
         assert {"point_order", "latitude", "longitude"} <= set(route_rows[0])
 
 
-async def test_app_tool_results_carry_resource_link(mcp_session) -> None:
-    """Claude's renderer keys off a resource_link in the result (in addition
-    to tool _meta.ui); ResourceLinkedApps prepends one via intercept_tool_call."""
+async def test_app_tool_results_carry_no_resource_link(mcp_session) -> None:
+    """Regression (0.9.1): 0.8.0 prepended a result-level resource_link as a
+    second rendering signal, but Claude Desktop renders a visible "Resource
+    links are not currently supported" notice for it instead of ignoring it.
+    App tools bind their UI via tool _meta.ui only — results must stay
+    link-free."""
     async with mcp_session() as session:
         for spec in APP_SPECS:
             result = await session.call_tool(spec.tool_name, _APP_ARGS[spec.tool_name])
             assert not result.is_error, spec.tool_name
-            link = result.content[0]
-            assert link.type == "resource_link", spec.tool_name
-            assert str(link.uri) == spec.uri
-            assert link.mime_type == "text/html;profile=mcp-app"
+            assert all(b.type != "resource_link" for b in result.content), spec.tool_name
 
-        # Plain tools stay link-free.
         plain = await session.call_tool(
             "get_charging_curve", {"charging_process_id": _CURVE_SESSION_ID, "max_points": 10}
         )
