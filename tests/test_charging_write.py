@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import psycopg
 import pytest
+from mcp.types import ElicitResult
 
 from teslamate_mcp.config import Settings
 from teslamate_mcp.db import build_pool, execute_write
@@ -30,6 +31,8 @@ async def test_write_tool_schema_when_enabled() -> None:
     schema = tool.input_schema
     assert sorted(schema["required"]) == ["charging_process_id", "cost"]
     assert "ctx" not in schema.get("properties", {})
+    # The Resolve-marked confirmation param is framework-filled, never client-facing.
+    assert "confirmation" not in schema.get("properties", {})
     assert schema["properties"]["cost"]["minimum"] == 0
     assert tool.annotations.read_only_hint is False
     assert tool.annotations.destructive_hint is True
@@ -71,6 +74,68 @@ async def test_set_charging_cost_e2e(mcp_session) -> None:
             "set_charging_cost", {"charging_process_id": 3, "cost": -1}
         )
         assert negative.is_error  # pydantic ge=0
+
+
+async def test_confirm_accept_writes(mcp_session) -> None:
+    """A client with form elicitation gets asked; accepting performs the write."""
+    asked: list[str] = []
+
+    async def approve(context, params):
+        asked.append(params.message)
+        return ElicitResult(action="accept", content={"confirm": True})
+
+    async with mcp_session(enable_charging_writes=True, elicitation_callback=approve) as session:
+        result = await session.call_tool(
+            "set_charging_cost", {"charging_process_id": 3, "cost": 9.75}
+        )
+        assert not result.is_error, [getattr(c, "text", c) for c in result.content]
+        (row,) = result.structured_content["result"]
+        assert row["cost"] == 9.75
+    assert len(asked) == 1
+    assert "#3" in asked[0] and "9.75" in asked[0]
+
+
+async def test_confirm_decline_blocks_write(mcp_session) -> None:
+    async def decline(context, params):
+        return ElicitResult(action="decline")
+
+    async with mcp_session(enable_charging_writes=True, elicitation_callback=decline) as session:
+        result = await session.call_tool(
+            "set_charging_cost", {"charging_process_id": 3, "cost": 9.75}
+        )
+        assert result.is_error
+
+        # The seeded NULL cost is untouched.
+        sessions = await session.call_tool("search_charging_sessions", {"car_name": "red"})
+        (row,) = sessions.structured_content["result"]
+        assert row["cost"] is None
+
+
+async def test_confirm_answered_no_blocks_write(mcp_session) -> None:
+    async def answer_no(context, params):
+        return ElicitResult(action="accept", content={"confirm": False})
+
+    async with mcp_session(enable_charging_writes=True, elicitation_callback=answer_no) as session:
+        result = await session.call_tool(
+            "set_charging_cost", {"charging_process_id": 3, "cost": 9.75}
+        )
+        assert result.is_error
+
+        sessions = await session.call_tool("search_charging_sessions", {"car_name": "red"})
+        (row,) = sessions.structured_content["result"]
+        assert row["cost"] is None
+
+
+async def test_no_elicitation_capability_degrades_to_direct_write(mcp_session) -> None:
+    """Clients without form elicitation (e.g. the portal today) keep the
+    pre-0.9 behavior: the write proceeds without a confirmation round."""
+    async with mcp_session(enable_charging_writes=True) as session:
+        result = await session.call_tool(
+            "set_charging_cost", {"charging_process_id": 3, "cost": 5.25}
+        )
+        assert not result.is_error, [getattr(c, "text", c) for c in result.content]
+        (row,) = result.structured_content["result"]
+        assert row["cost"] == 5.25
 
 
 async def test_column_scoped_grant_is_the_real_boundary(pool, database_url) -> None:

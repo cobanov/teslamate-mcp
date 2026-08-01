@@ -222,11 +222,15 @@ def mcp_session(seeded_database):
     """
 
     @asynccontextmanager
-    async def factory(**overrides):
+    async def factory(*, elicitation_callback=None, **overrides):
         settings = Settings(database_url=seeded_database, **overrides)  # type: ignore[call-arg]
         mcp = create_server(settings)
         try:
-            async with Client(mcp, raise_exceptions=False) as client:
+            # The in-memory client advertises the elicitation capability only
+            # when a callback is passed, so both confirm branches are reachable.
+            async with Client(
+                mcp, raise_exceptions=False, elicitation_callback=elicitation_callback
+            ) as client:
                 yield client
         finally:
             # The lifespan closes the pool on client exit; this covers the

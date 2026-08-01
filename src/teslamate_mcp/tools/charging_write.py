@@ -9,11 +9,18 @@ boundary — even a bug here cannot touch anything else.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Annotated, Any
 
-from mcp.server.mcpserver import Context, MCPServer
+from mcp.server.mcpserver import (
+    AcceptedElicitation,
+    Context,
+    Elicit,
+    ElicitationResult,
+    MCPServer,
+    Resolve,
+)
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from ..db import execute_write
 
@@ -31,6 +38,41 @@ RETURNING id AS charging_process_id,
 """
 
 
+class CostConfirmation(BaseModel):
+    """Elicitation form: a single yes/no approval of the pending write."""
+
+    confirm: bool = Field(description="Approve writing this cost to the TeslaMate database.")
+
+
+def _client_supports_form_elicitation(ctx: Context) -> bool:
+    # Mirrors the SDK's _require_capability predicate: a bare `elicitation: {}`
+    # (the only shape before modes existed) counts as form support; url-only
+    # does not.
+    capabilities = ctx.client_capabilities
+    elicitation = capabilities.elicitation if capabilities is not None else None
+    return elicitation is not None and (elicitation.form is not None or elicitation.url is None)
+
+
+async def _confirm_cost(
+    ctx: Context, charging_process_id: int, cost: float
+) -> Elicit[CostConfirmation] | CostConfirmation:
+    """Ask the user to confirm the write when the client can show a form.
+
+    Clients without form elicitation (e.g. portal-fronted connectors today)
+    keep the pre-0.9 behavior: the write proceeds without a confirmation
+    step. The declarative Elicit marker works on the stateless 2026-07-28
+    transport (via InputRequiredResult), where imperative ctx.elicit() would
+    raise NoBackChannelError.
+    """
+    if not _client_supports_form_elicitation(ctx):
+        return CostConfirmation(confirm=True)
+    return Elicit(
+        f"Set the cost of charging session #{charging_process_id} to {cost:.2f} "
+        "(overwrites any stored cost)?",
+        CostConfirmation,
+    )
+
+
 def register_charging_write_tools(mcp: MCPServer) -> None:
     """Register `set_charging_cost` and its receipt-backfill prompt."""
 
@@ -44,12 +86,15 @@ def register_charging_write_tools(mcp: MCPServer) -> None:
     description = (
         "Set the total cost of one charging session in the TeslaMate database "
         "(the same field TeslaMate's own UI edits). Find the session id with "
-        "search_charging_sessions first. Overwrites any existing cost. Returns "
-        "the updated session for confirmation."
+        "search_charging_sessions first. Overwrites any existing cost. On "
+        "clients that support elicitation the user is shown a confirmation "
+        "dialog before the write happens. Returns the updated session for "
+        "confirmation."
     )
 
     async def set_charging_cost(
         ctx: Context,
+        confirmation: Annotated[ElicitationResult[CostConfirmation], Resolve(_confirm_cost)],
         charging_process_id: int = Field(
             ...,
             description="The charging session's id, as returned by search_charging_sessions.",
@@ -61,6 +106,8 @@ def register_charging_write_tools(mcp: MCPServer) -> None:
             description="Total cost of the session, in the currency configured in TeslaMate.",
         ),
     ) -> list[dict[str, Any]]:
+        if not (isinstance(confirmation, AcceptedElicitation) and confirmation.data.confirm):
+            raise ValueError("Confirmation declined; no cost was written.")
         pool = ctx.request_context.lifespan_context.pool
         logger.info("Setting cost of charging session %d to %s", charging_process_id, cost)
         rows = await execute_write(

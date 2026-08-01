@@ -123,6 +123,7 @@ async def test_parameterized_tool_schemas() -> None:
     schema_tool = tools["get_database_schema"].input_schema
     assert "table" in schema_tool["properties"]
     assert "table" not in schema_tool.get("required", [])
+    assert schema_tool["properties"]["refresh"]["default"] is False
 
 
 def _row_properties(output_schema: dict) -> dict:

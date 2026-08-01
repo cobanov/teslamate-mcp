@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import psycopg
 from mcp import Client
 
 from teslamate_mcp.config import Settings
@@ -301,3 +302,24 @@ async def test_schema_tool_compact_and_detail(mcp_session) -> None:
 
         unknown = await session.call_tool("get_database_schema", {"table": "not_a_table"})
         assert unknown.is_error
+
+
+async def test_schema_refresh_picks_up_live_ddl(mcp_session, seeded_database) -> None:
+    async with mcp_session() as session:
+        before = rows_from(await session.call_tool("get_database_schema", {}))
+        assert all(r["table_name"] != "post_boot_table" for r in before)
+
+        conn = await psycopg.AsyncConnection.connect(seeded_database, autocommit=True)
+        try:
+            await conn.execute("CREATE TABLE post_boot_table (id INT)")
+
+            # The warmed cache is stale by design without the refresh flag...
+            stale = rows_from(await session.call_tool("get_database_schema", {}))
+            assert all(r["table_name"] != "post_boot_table" for r in stale)
+
+            # ...and refresh=true re-reads information_schema on demand.
+            fresh = rows_from(await session.call_tool("get_database_schema", {"refresh": True}))
+            assert any(r["table_name"] == "post_boot_table" for r in fresh)
+        finally:
+            await conn.execute("DROP TABLE IF EXISTS post_boot_table")
+            await conn.close()
