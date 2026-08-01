@@ -1,6 +1,9 @@
 # Internal docs with real deployment values — never committed
 docs_internal/
 
+# Local AI-assistant instructions (kept out of the public tree)
+/CLAUDE.md
+
 # Python-generated files
 __pycache__/
 *.py[oc]
