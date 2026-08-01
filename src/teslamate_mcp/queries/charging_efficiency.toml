@@ -1,0 +1,43 @@
+name = "get_charging_efficiency"
+description = "Charging efficiency per car split by AC vs DC: energy that reached the battery (kWh added) vs energy drawn from the charger (kWh used), with the resulting efficiency percentage. DC fast-charge sessions are detected via charge samples with no charger phases. Only sessions with recorded energy-used data count."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to include charging sessions from."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "charge_type"
+type = "string"
+description = "AC or DC."
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "kwh_added"
+type = "number"
+description = "Energy that reached the battery."
+
+[[output]]
+name = "kwh_used"
+type = "number"
+description = "Energy drawn from the charger (includes conversion and thermal losses)."
+
+[[output]]
+name = "efficiency_pct"
+type = "number"
+description = "100 * added / used."

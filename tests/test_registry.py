@@ -16,7 +16,7 @@ _DUMMY_DB_URL = "postgresql://teslamate:secret@example.test/teslamate"
 def test_discover_finds_all_bundled_tools() -> None:
     tools = discover_predefined_tools()
     names = {t.name for t in tools}
-    assert len(tools) == 23
+    assert len(tools) == 30
     # Spot-check that a few expected tools are present.
     assert "get_basic_car_information" in names
     assert "get_battery_health_summary" in names
@@ -26,6 +26,13 @@ def test_discover_finds_all_bundled_tools() -> None:
     assert "get_drive_details" in names
     assert "get_charging_curve" in names
     assert "get_charging_costs" in names
+    assert "get_battery_capacity_trend" in names
+    assert "get_vampire_drain" in names
+    assert "get_charging_efficiency" in names
+    assert "get_charging_by_geofence" in names
+    assert "get_soc_hygiene" in names
+    assert "get_period_comparison" in names
+    assert "get_drive_route" in names
 
 
 def test_each_tool_has_nonempty_metadata() -> None:
@@ -38,7 +45,7 @@ def test_each_tool_has_nonempty_metadata() -> None:
 def test_every_tool_accepts_a_car_scope_or_is_id_scoped() -> None:
     # Every predefined report should be filterable by car unless it targets a
     # single entity by id (drive/charging session detail tools).
-    id_scoped = {"get_drive_details", "get_charging_curve"}
+    id_scoped = {"get_drive_details", "get_charging_curve", "get_drive_route"}
     for tool in discover_predefined_tools():
         param_names = {p.name for p in tool.params}
         if tool.name in id_scoped:
@@ -100,6 +107,18 @@ async def test_parameterized_tool_schemas() -> None:
 
     costs = tools["get_charging_costs"].input_schema
     assert costs["properties"]["group_by"]["enum"] == ["month", "location", "car"]
+
+    vampire = tools["get_vampire_drain"].input_schema
+    assert vampire["properties"]["min_gap_hours"]["default"] == 5.0
+    assert vampire["properties"]["limit"]["default"] == 20
+    assert vampire.get("required", []) == []
+
+    route = tools["get_drive_route"].input_schema
+    assert route["required"] == ["drive_id"]
+    assert route["properties"]["max_points"]["default"] == 200
+
+    comparison = tools["get_period_comparison"].input_schema
+    assert comparison["properties"]["days"]["default"] == 30
 
     schema_tool = tools["get_database_schema"].input_schema
     assert "table" in schema_tool["properties"]

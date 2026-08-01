@@ -1,0 +1,37 @@
+name = "get_charging_by_geofence"
+description = "Charging totals grouped by TeslaMate geofence (the user-defined named zones like Home or Work, more meaningful than reverse-geocoded addresses): session count, energy added (kWh), total cost, and average cost per kWh. Sessions outside every geofence are grouped as 'Ungeofenced'. All cars combined unless filtered."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to include charging sessions from."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "geofence"
+type = "string"
+description = "Geofence name, or 'Ungeofenced'."
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "kwh_added"
+type = "number"
+
+[[output]]
+name = "total_cost"
+type = "number"
+description = "Sum of recorded session costs; sessions with no cost contribute nothing."
+
+[[output]]
+name = "avg_cost_per_kwh"
+type = "number"

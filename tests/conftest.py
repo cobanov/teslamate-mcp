@@ -45,13 +45,16 @@ INSERT INTO demo_cars (name, battery_kwh) VALUES
     ('Model Y', 82.50);
 
 DROP TABLE IF EXISTS charges, charging_processes, drives, positions, updates,
-    addresses, car_settings, cars CASCADE;
+    addresses, geofences, car_settings, cars CASCADE;
 CREATE TABLE car_settings (id BIGINT PRIMARY KEY, enabled BOOLEAN DEFAULT TRUE,
     free_supercharging BOOLEAN DEFAULT FALSE);
 CREATE TABLE cars (id SMALLINT PRIMARY KEY, name TEXT, model TEXT, trim_badging TEXT,
     exterior_color TEXT, marketing_name TEXT, settings_id BIGINT REFERENCES car_settings(id));
 CREATE TABLE addresses (id BIGINT PRIMARY KEY, display_name TEXT, city TEXT, state TEXT,
     latitude DOUBLE PRECISION, longitude DOUBLE PRECISION);
+CREATE TABLE geofences (id BIGINT PRIMARY KEY, name TEXT, latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION, radius SMALLINT, cost_per_unit NUMERIC,
+    session_fee NUMERIC, billing_type TEXT);
 CREATE TABLE drives (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAMP,
     end_date TIMESTAMP, distance DOUBLE PRECISION, duration_min SMALLINT, speed_max SMALLINT,
     power_max SMALLINT, power_min SMALLINT, start_km DOUBLE PRECISION, end_km DOUBLE PRECISION,
@@ -60,16 +63,19 @@ CREATE TABLE drives (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAM
     start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION);
 CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAMP,
     end_date TIMESTAMP, charge_energy_added DOUBLE PRECISION, duration_min INTEGER,
-    cost NUMERIC(10,2), address_id BIGINT);
+    cost NUMERIC(10,2), address_id BIGINT, geofence_id BIGINT,
+    start_battery_level SMALLINT, end_battery_level SMALLINT,
+    charge_energy_used DOUBLE PRECISION);
 CREATE TABLE charges (id SERIAL PRIMARY KEY, charging_process_id INTEGER, date TIMESTAMP,
     battery_level SMALLINT, charger_power SMALLINT, charger_voltage INTEGER,
-    charger_actual_current SMALLINT, rated_battery_range_km DOUBLE PRECISION,
-    outside_temp DOUBLE PRECISION);
+    charger_actual_current SMALLINT, charger_phases SMALLINT,
+    rated_battery_range_km DOUBLE PRECISION, outside_temp DOUBLE PRECISION);
 CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     latitude DOUBLE PRECISION, longitude DOUBLE PRECISION, battery_level SMALLINT,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
     ideal_battery_range_km DOUBLE PRECISION, est_battery_range_km DOUBLE PRECISION,
     odometer DOUBLE PRECISION, outside_temp DOUBLE PRECISION, is_climate_on BOOLEAN,
+    speed SMALLINT, power SMALLINT,
     tpms_pressure_fl DOUBLE PRECISION, tpms_pressure_fr DOUBLE PRECISION,
     tpms_pressure_rl DOUBLE PRECISION, tpms_pressure_rr DOUBLE PRECISION);
 CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
@@ -92,20 +98,35 @@ INSERT INTO drives (car_id, start_date, end_date, distance, duration_min, speed_
     (2, now() - interval '1 day', now() - interval '1 day' + interval '10 min',
      5.0, 10, 60, 80, -20, 500.0, 505.0, 20.0, 15.0, 2, 1, 350.0, 348.0),
     (1, TIMESTAMP '2026-01-15 22:30:00', TIMESTAMP '2026-01-15 23:10:00',
-     42.0, 40, 110, 150, -30, 800.0, 842.0, 21.0, 8.0, 1, 2, 420.0, 400.0);
+     42.0, 40, 110, 150, -30, 800.0, 842.0, 21.0, 8.0, 1, 2, 420.0, 400.0),
+    (1, now() - interval '45 days', now() - interval '45 days' + interval '15 min',
+     8.0, 15, 80, 100, -30, 1500.0, 1508.0, 21.0, 20.0, 2, 1, 350.0, 340.0),
+    (1, now() - interval '45 days' + interval '12 hours',
+     now() - interval '45 days' + interval '12 hours 14 min',
+     7.0, 14, 70, 90, -25, 1508.0, 1515.0, 21.0, 20.0, 1, 2, 335.0, 328.0);
+INSERT INTO geofences (id, name, latitude, longitude, radius, cost_per_unit, session_fee,
+    billing_type) VALUES
+    (1, 'Home', 41.0, 29.0, 25, 0.28, NULL, 'per_kwh');
 INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
-    duration_min, cost, address_id) VALUES
+    duration_min, cost, address_id, geofence_id, start_battery_level, end_battery_level,
+    charge_energy_used) VALUES
     (1, now() - interval '1 day', now() - interval '1 day' + interval '30 min',
-     30.0, 30, 12.50, 1),
+     30.0, 30, 12.50, 1, 1, 40, 80, 33.0),
     (1, now() - interval '10 days', now() - interval '10 days' + interval '40 min',
-     50.0, 40, 30.00, 3),
+     50.0, 40, 30.00, 3, NULL, 20, 85, 54.0),
     (2, now() - interval '3 days', now() - interval '3 days' + interval '60 min',
-     20.0, 60, NULL, 1);
+     20.0, 60, NULL, 1, 1, 30, 55, 21.0);
 INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_voltage,
-    charger_actual_current, rated_battery_range_km, outside_temp)
+    charger_actual_current, charger_phases, rated_battery_range_km, outside_temp)
 SELECT 1, now() - interval '1 day' + (n || ' minutes')::interval,
-       50 + n, 11, 230, 16, 300.0 + n, 15.0
+       50 + n, 11, 230, 16, 1, 300.0 + n, 15.0
 FROM generate_series(0, 29) AS n;
+-- DC fast-charge samples for session 2 (charger_phases NULL marks DC).
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_voltage,
+    charger_actual_current, charger_phases, rated_battery_range_km, outside_temp)
+SELECT 2, now() - interval '10 days' + (n * 8 || ' minutes')::interval,
+       20 + 16 * n, 150, 400, 375, NULL, 100.0 + 60 * n, 18.0
+FROM generate_series(0, 4) AS n;
 INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_battery_level,
     rated_battery_range_km, ideal_battery_range_km, est_battery_range_km, odometer, outside_temp,
     is_climate_on, tpms_pressure_fl, tpms_pressure_fr, tpms_pressure_rl, tpms_pressure_rr) VALUES
@@ -115,6 +136,22 @@ INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_
      TRUE, 2.9, 3.0, 2.8, 2.9),
     (2, now() - interval '2 hours', 41.1, 29.1, 60, 59, 210.0, 350.0, 200.0, 505.0, 15.0,
      FALSE, 3.1, 3.1, 3.0, 3.0);
+-- SOC-hygiene samples: recent, tpms NULL (tire query filters them out), battery < 100
+-- (degradation query filters on = 100), and older than each car's latest position so
+-- current_car_status still returns the rows seeded above.
+INSERT INTO positions (car_id, date, battery_level, usable_battery_level) VALUES
+    (1, now() - interval '3 days', 15, 14),
+    (1, now() - interval '60 hours', 90, 89),
+    (1, now() - interval '2 days', 55, 54),
+    (2, now() - interval '3 days', 25, 24),
+    (2, now() - interval '40 hours', 85, 84);
+-- Route points inside the fixed TZ-boundary drive (id 4), for get_drive_route.
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_battery_level,
+    odometer, speed, power)
+SELECT 1, TIMESTAMP '2026-01-15 22:30:00' + (n * 3 || ' minutes')::interval,
+       41.0 + 0.007 * n, 29.0 + 0.005 * n, 80 - n, 79 - n,
+       800.0 + 3.8 * n, 40 + 5 * n, 20 + n
+FROM generate_series(0, 11) AS n;
 INSERT INTO updates (car_id, version, start_date, end_date) VALUES
     (1, '2026.20.1', now() - interval '5 days', now() - interval '5 days' + interval '25 min');
 """

@@ -1,0 +1,63 @@
+name = "get_vampire_drain"
+description = "Vampire (standby) drain: rated range lost while parked between consecutive drives, excluding any gap that contains a charging session. Computed from each drive's ending rated range vs the next drive's starting rated range. Returns the worst gaps first with duration, range loss (km), loss rate per hour, and the parking location."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look for parking gaps (by gap start)."
+default = 90
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_gap_hours"
+type = "number"
+description = "Only parking gaps at least this many hours long."
+default = 5.0
+minimum = 0.5
+maximum = 720.0
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 20
+minimum = 1
+maximum = 200
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "gap_start"
+type = "string"
+description = "When the car was parked (end of the previous drive, UTC)."
+
+[[output]]
+name = "gap_end"
+type = "string"
+description = "When the next drive started (UTC)."
+
+[[output]]
+name = "gap_hours"
+type = "number"
+
+[[output]]
+name = "range_loss_km"
+type = "number"
+description = "Rated range lost while parked."
+
+[[output]]
+name = "loss_km_per_hour"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+description = "Reverse-geocoded address where the car was parked."

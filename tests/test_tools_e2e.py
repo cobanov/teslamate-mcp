@@ -142,6 +142,122 @@ async def test_charging_costs_group_by(mcp_session) -> None:
         assert {r["group_key"] for r in by_location} == {"Home Street 1", "Supercharger Edirne"}
 
 
+async def test_battery_capacity_trend(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_battery_capacity_trend", {}))
+        red = next(r for r in rows if r["car_name"] == "Red Rocket")
+        assert red["avg_est_capacity_kwh"] == 80.0  # 20 kWh / 25% SOC gained
+        assert red["sessions"] == 1
+
+        # A high SOC-delta threshold keeps only the 65%-gain session.
+        strict = rows_from(
+            await session.call_tool("get_battery_capacity_trend", {"min_soc_delta": 50})
+        )
+        assert len(strict) == 1
+        assert strict[0]["car_name"] == "Blue Thunder"
+        assert strict[0]["avg_est_capacity_kwh"] == 76.9  # 50 kWh / 65%
+
+
+async def test_soc_hygiene_percentages(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_soc_hygiene", {"car_name": "blue"}))
+        assert len(rows) == 1
+        blue = rows[0]
+        assert blue["samples"] == 5  # SOC values 100, 80, 15, 90, 55
+        assert blue["pct_above_80"] == 40.0  # 100 and 90 (80 itself is not "above")
+        assert blue["pct_below_20"] == 20.0  # 15
+        assert blue["avg_soc"] == 68.0
+
+
+async def test_vampire_drain_finds_only_uncharged_gaps(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_vampire_drain", {}))
+        # Exactly one qualifying gap: the 11.75 h stop between the two drives
+        # 45 days ago. Gaps containing a charging session and gaps where range
+        # increased (charged at the next drive's start) must be excluded.
+        assert len(rows) == 1
+        gap = rows[0]
+        assert gap["car_name"] == "Blue Thunder"
+        assert gap["range_loss_km"] == 5.0
+        assert gap["gap_hours"] == 11.8
+        assert gap["location"] == "Home Street 1"
+        assert all(r["range_loss_km"] >= 0 for r in rows)
+
+
+async def test_charging_efficiency_splits_ac_dc(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_charging_efficiency", {}))
+        buckets = {(r["car_name"], r["charge_type"]): r for r in rows}
+        assert set(buckets) == {
+            ("Blue Thunder", "AC"),
+            ("Blue Thunder", "DC"),
+            ("Red Rocket", "AC"),
+        }
+        assert buckets[("Blue Thunder", "AC")]["efficiency_pct"] == 90.9  # 30 / 33
+        assert buckets[("Blue Thunder", "DC")]["efficiency_pct"] == 92.6  # 50 / 54
+
+
+async def test_charging_by_geofence_buckets(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_charging_by_geofence", {}))
+        buckets = {r["geofence"]: r for r in rows}
+        assert set(buckets) == {"Home", "Ungeofenced"}
+        assert buckets["Home"]["sessions"] == 2
+        assert buckets["Home"]["kwh_added"] == 50.0
+        assert buckets["Home"]["avg_cost_per_kwh"] == 0.25  # 12.50 / 50 kWh
+
+        blue_only = rows_from(
+            await session.call_tool("get_charging_by_geofence", {"car_name": "blue"})
+        )
+        blue_home = next(r for r in blue_only if r["geofence"] == "Home")
+        assert blue_home["sessions"] == 1
+        assert blue_home["kwh_added"] == 30.0
+
+
+async def test_period_comparison_windows(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(await session.call_tool("get_period_comparison", {}))
+        metrics = {r["metric"]: r for r in rows}
+        assert set(metrics) == {
+            "distance_km",
+            "drive_count",
+            "kwh_added",
+            "charge_cost",
+            "charge_sessions",
+        }
+        assert metrics["distance_km"]["current_value"] == 137.5  # 12.5 + 120 + 5
+        assert metrics["distance_km"]["previous_value"] == 15.0  # 8 + 7, 45 days ago
+        assert metrics["distance_km"]["change_pct"] == 816.7
+        assert metrics["drive_count"]["current_value"] == 3.0
+        assert metrics["drive_count"]["previous_value"] == 2.0
+        # No charging in the previous window: percent change is null, not a crash.
+        assert metrics["kwh_added"]["current_value"] == 100.0
+        assert metrics["kwh_added"]["previous_value"] == 0.0
+        assert metrics["kwh_added"]["change_pct"] is None
+
+
+async def test_drive_route_downsamples(mcp_session) -> None:
+    async with mcp_session() as session:
+        rows = rows_from(
+            await session.call_tool("get_drive_route", {"drive_id": _TZ_BOUNDARY_DRIVE_ID})
+        )
+        assert len(rows) == 12  # 12 seeded track points, under the default cap
+        assert [r["point_order"] for r in rows] == list(range(1, 13))
+        assert rows[0]["latitude"] == 41.0
+        assert rows[-1]["latitude"] == 41.077
+        assert rows[0]["battery_level"] == 80
+        timestamps = [r["ts"] for r in rows]
+        assert timestamps == sorted(timestamps)
+
+        capped = rows_from(
+            await session.call_tool(
+                "get_drive_route",
+                {"drive_id": _TZ_BOUNDARY_DRIVE_ID, "max_points": 10},
+            )
+        )
+        assert len(capped) == 10
+
+
 async def test_report_timezone_shifts_day_buckets(mcp_session) -> None:
     async with mcp_session() as session:
         utc_days = json.dumps(rows_from(await session.call_tool("get_drive_summary_per_day", {})))
