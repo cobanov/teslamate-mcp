@@ -49,7 +49,10 @@ def _make_health(server: MCPServer) -> Callable[[Request], Awaitable[JSONRespons
                 async with context.pool.connection() as conn:
                     await conn.execute("SELECT 1")
         except Exception as exc:  # any failure here means "not serving"
-            detail = str(exc).strip().splitlines()[0] or type(exc).__name__
+            # Some psycopg errors stringify to "", and an empty str has no
+            # lines at all — indexing it would 500 the probe it exists to keep
+            # honest. Fall back to the class name.
+            detail = next(iter(str(exc).strip().splitlines()), None) or type(exc).__name__
             body |= {"status": "degraded", "database": "unreachable", "detail": detail[:200]}
             return JSONResponse(body, status_code=503)
         return JSONResponse(body)

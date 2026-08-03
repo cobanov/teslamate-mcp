@@ -29,4 +29,30 @@ Only the most recent minor release receives security fixes. Older versions shoul
 3. Result sets are capped: if the user query has no `LIMIT`, the planner sees a wrapped `SELECT * FROM (<q>) LIMIT N`.
 4. The HTTP transport supports bearer-token authentication with timing-safe comparison.
 
-We **strongly recommend** connecting `teslamate-mcp` with a dedicated PostgreSQL role that only has `SELECT` privileges on the TeslaMate schema. This way a SQL-layer escape still cannot mutate data.
+### Use a non-superuser role — this matters more than it sounds
+
+We **strongly recommend** connecting `teslamate-mcp` with a dedicated PostgreSQL role that only has `SELECT` privileges on the TeslaMate schema:
+
+```sql
+CREATE ROLE teslamate_ro LOGIN PASSWORD '…';
+GRANT CONNECT ON DATABASE teslamate TO teslamate_ro;
+GRANT USAGE ON SCHEMA public TO teslamate_ro;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO teslamate_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO teslamate_ro;
+```
+
+TeslaMate's own Docker Compose sets `POSTGRES_USER=teslamate`, which makes that role a **superuser**. If you point `DATABASE_URL` at it, the guards above still stop every write — but the `READ ONLY` transaction does not restrict superuser-only *read* functions. A model driving `run_sql` could then reach, for example:
+
+```sql
+SELECT pg_read_file('/etc/passwd');   -- arbitrary file read in the database container
+SELECT pg_ls_dir('/var/lib/postgresql');
+SELECT rolname, rolpassword FROM pg_authid;
+```
+
+None of these are writes, so none are blocked. The realistic path here is not a network attacker — it is prompt injection steering the model that writes the SQL. A non-superuser role removes the capability entirely, which no application-layer filter can do as reliably.
+
+### Known limitations
+
+- **The row cap can be bypassed.** `run_sql` only wraps a query in `LIMIT` when it finds no `LIMIT` of its own, and that check does not distinguish a nested one — `SELECT * FROM (SELECT … LIMIT 5000000) x` runs uncapped. `statement_timeout` still bounds it in time, but a large result can still consume memory.
+- **`/health` is unauthenticated by design** so container health checks can reach it, and it reports a short `detail` string when the database is unreachable. Treat that as information disclosure if you expose the endpoint publicly.
+- **Write confirmation is not a security control.** When `ENABLE_CHARGING_WRITES` is on, clients without form elicitation proceed without a confirmation prompt. The column-scoped grant is the boundary.

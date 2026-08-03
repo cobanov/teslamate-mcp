@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-03
+
+### Fixed
+- **`/health` could return 500 instead of 503.** The 0.10.0 probe took the
+  first line of `str(exc)` to build its `detail` field, but an empty message
+  has no lines at all — and `asyncio.timeout` raises exactly that, a bare
+  `TimeoutError`. So the most likely failure the probe exists to report, a
+  database too slow to answer within 3s, crashed the probe instead of
+  reporting `degraded`. Regression-tested.
+
+### Changed
+- **`env.example` now defaults to a read-only role.** TeslaMate's own Compose
+  sets `POSTGRES_USER=teslamate`, making that role a superuser. Pointing
+  `DATABASE_URL` at it leaves every write blocked but still permits
+  superuser-only *read* functions through `run_sql` — `pg_read_file`,
+  `pg_ls_dir`, `pg_authid`. `SECURITY.md` now documents this explicitly, with
+  the `CREATE ROLE` snippet and two other known limitations (the row cap is
+  bypassable by a nested `LIMIT`; `/health` is unauthenticated by design).
+- The Unraid + Cloudflare walkthrough moved from `deploy/unraid/` to the
+  [wiki](https://github.com/cobanov/teslamate-mcp/wiki/Unraid-Deployment). The
+  Community Applications template stays in the repository.
+
 ## [0.10.0] - 2026-08-02
 
 ### Fixed
