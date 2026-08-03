@@ -11,7 +11,7 @@
   <a href="https://github.com/cobanov/teslamate-mcp/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/cobanov/teslamate-mcp?color=e82127&labelColor=1a1a1a"></a>
   <a href="https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp"><img alt="ghcr" src="https://img.shields.io/badge/ghcr.io-multi--arch-e82127?labelColor=1a1a1a"></a>
   <img alt="tools" src="https://img.shields.io/badge/tools-35-e82127?labelColor=1a1a1a">
-  <img alt="tests" src="https://img.shields.io/badge/tests-124-e82127?labelColor=1a1a1a">
+  <a href="https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml"><img alt="ci" src="https://img.shields.io/github/actions/workflow/status/cobanov/teslamate-mcp/ci.yml?branch=main&label=ci&color=e82127&labelColor=1a1a1a"></a>
   <a href="LICENSE"><img alt="licence" src="https://img.shields.io/badge/licence-MIT-e82127?labelColor=1a1a1a"></a>
 </p>
 

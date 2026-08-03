@@ -115,3 +115,27 @@ async def test_health_reports_ok_against_a_live_database(pool):
 
     assert response.status_code == 200
     assert json.loads(response.body)["database"] == "ok"
+
+
+async def test_health_survives_an_exception_with_no_message():
+    """Regression: an empty str(exc) has no lines, and indexing it 500'd the probe.
+
+    `asyncio.timeout` raises a bare TimeoutError that stringifies to "", so a
+    database slow enough to trip the probe's own 3s cap — precisely the case
+    the probe exists for — took this path.
+    """
+
+    class _Pool:
+        closed = False
+
+        def connection(self):
+            raise TimeoutError()
+
+    handler = cli._make_health(SimpleNamespace(teslamate_app_context=SimpleNamespace(pool=_Pool())))
+
+    response = await handler(SimpleNamespace())
+
+    assert response.status_code == 503
+    body = json.loads(response.body)
+    assert body["status"] == "degraded"
+    assert body["detail"] == "TimeoutError"
