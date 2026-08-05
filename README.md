@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fcobanov%2Fteslamate-mcp.svg)](https://mcptoplist.com/server/glama%2Fcobanov%2Fteslamate-mcp)
+
 <p align="center">
   <img src="assets/teslamcp.gif" alt="teslamate-mcp" width="640">
 </p>
