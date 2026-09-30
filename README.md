@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 11 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 61 tools, 12 prompts, and interactive charts.
 
 [![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
@@ -30,9 +30,9 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serve
 
 ## Highlights
 
-- **47 SQL report tools.** Battery capacity and degradation, sleep and state history, a timeline of each day, trips, range estimates, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
-- **8 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
-- **Guidance for the assistant.** MCP instructions and 11 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
+- **50 SQL report tools.** Battery capacity and degradation, sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, range estimates, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
+- **9 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a year- or month-in-review card, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
+- **Guidance for the assistant.** MCP instructions and 12 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
 - **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
 - **Safe custom SQL.** `run_sql` runs your `SELECT` inside a PostgreSQL `READ ONLY` transaction, with timeouts and a row cap. The transaction always rolls back.
 - **Optional cost writes, with confirmation.** One opt-in tool writes charging costs. A column-scoped database grant limits what it can touch. Clients with MCP elicitation show a confirmation dialog first.
@@ -115,7 +115,7 @@ The server also sends MCP `instructions`: how to read units, time zones and cost
 | Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |
 | Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
 
-### Insights (8)
+### Insights (11)
 
 | Tool | What it returns |
 |---|---|
@@ -126,6 +126,9 @@ The server also sends MCP `instructions`: how to read units, time zones and cost
 | `get_soc_hygiene` | Share of samples above 80% and below 20% state of charge |
 | `get_period_comparison` | The last N days vs the N days before, one row per metric |
 | `get_activity_report` | A month by day or a year by month: drives, distance, consumption, charging, and cost per bucket, empty days included |
+| `get_recap` | A year or month in review in one row: totals, distance against the period before (cut at the same point while it runs), charging and cost, and highlights: longest drive, busiest day, most efficient day or month, favourite destination and charging spot, top speed, temperature range, software updates |
+| `get_parked_climate_sessions` | Times the climate ran while parked (preconditioning, cooling down after arriving, Keep Climate / Dog / Camp mode): minutes, estimated battery kWh, cooling or heating, temperatures, and where |
+| `get_climate_usage` | The same per month: sessions, preconditioning count, hours, hours plugged in, estimated kWh and cost |
 | `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only), with a conservative figure and the arrival battery % |
 
 ### Timeline and car state (3)
@@ -178,18 +181,18 @@ A session is DC when a sample came from a fast charger, or had no AC phases whil
 | `get_fast_charging_by_location` | The same per location and charger type: which fast chargers are fastest and cheapest for your car |
 | `get_charging_curve_comparison` | Power against battery % for several sessions, for overlaying their curves |
 
-### Charts (8)
+### Charts (9)
 
-`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, and `show_efficiency_vs_temperature` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Both maps draw an elevation profile under the track; hovering it finds the place on the map. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. Set `MAP_TILES=false` to keep the maps fully offline.
+`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, `show_efficiency_vs_temperature`, and `show_recap` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Both maps draw an elevation profile under the track; hovering it finds the place on the map. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. `show_recap` is a year- or month-in-review card with the headline distance and highlights. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 
 - `get_database_schema` — lists all tables, shows the columns of one table, and re-reads the schema when you pass `refresh=true`.
 - `run_sql` — runs one custom `SELECT` or `WITH … SELECT`.
 
-### Prompts (11)
+### Prompts (12)
 
-Ready-made workflows that name the tools to call, in order: `status_report`, `summarize_driving`, `analyze_battery_health`, `analyze_charging`, `find_anomalies`, `weather_efficiency`, `diagnose_sleep`, `plan_trip`, `review_trip`, `monthly_recap`, and `charging_costs_and_savings`. With cost writes on, `backfill_costs_from_receipts` joins them.
+Ready-made workflows that name the tools to call, in order: `status_report`, `summarize_driving`, `analyze_battery_health`, `analyze_charging`, `find_anomalies`, `weather_efficiency`, `diagnose_sleep`, `plan_trip`, `review_trip`, `monthly_recap`, `year_in_review`, and `charging_costs_and_savings`. With cost writes on, `backfill_costs_from_receipts` joins them.
 
 ### Cost writes (opt-in, off by default)
 

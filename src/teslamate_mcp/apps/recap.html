@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Recap</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1d8a63;
+    --series-4: #a256c9;
+    --series-5: #c9375f;
+    --series-6: #8a7a1d;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #27a578;
+      --series-4: #b06bd6;
+      --series-5: #d9527a;
+      --series-6: #a89a3a;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #27a578;
+    --series-4: #b06bd6;
+    --series-5: #d9527a;
+    --series-6: #a89a3a;
+    --border: rgba(255,255,255,0.10);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 16px 16px 12px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .hero { margin: 14px 0 4px; }
+  .hero .v { font-size: 48px; font-weight: 650; line-height: 1.05; letter-spacing: -0.02em; }
+  .hero .v .u { font-size: 20px; font-weight: 600; color: var(--text-secondary); margin-left: 4px; letter-spacing: 0; }
+  .hero .l { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  .delta { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text-primary); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; margin-top: 14px; }
+  .tile { border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; }
+  .tile .l { font-size: 11px; color: var(--text-muted); }
+  .tile .v { font-size: 18px; font-weight: 600; margin-top: 2px; }
+  .tile .d { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  h2 { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin: 16px 0 6px; }
+  .highlights { list-style: none; padding: 0; display: grid; gap: 6px; }
+  .highlights li { display: grid; grid-template-columns: 4px 1fr; gap: 10px; align-items: stretch; }
+  .highlights .bar { border-radius: 2px; background: var(--series-1); }
+  .highlights .k { font-size: 11px; color: var(--text-muted); }
+  .highlights .t { font-size: 13px; margin-top: 1px; overflow-wrap: anywhere; }
+  .highlights .t b { font-weight: 600; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  details { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px; }
+  summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  td:last-child { text-align: right; overflow-wrap: anywhere; }
+  th { color: var(--text-muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Recap</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div id="content" hidden>
+    <div class="hero" id="hero"></div>
+    <div class="tiles" id="tiles"></div>
+    <h2 id="hlTitle">Highlights</h2>
+    <ul class="highlights" id="highlights"></ul>
+  </div>
+  <div class="state" id="state">Waiting for the recap…</div>
+  <details id="tableWrap" hidden>
+    <summary>Data table</summary>
+    <div id="tableBox" style="overflow-x:auto"></div>
+  </details>
+</div>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  if (msg.method === "ping" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  // Answer any other host request so it fails fast instead of timing out.
+  if (msg.method && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+  }
+});
+
+// Params per McpUiInitializeRequest (ext-apps 2026-01-26): appInfo,
+// appCapabilities and protocolVersion are all required. Hosts validate them
+// and send tool-input/tool-result only after `initialized`, so a rejected
+// handshake leaves the view empty.
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  appInfo: { name: "teslamate-recap", version: "1.0.0" },
+  appCapabilities: {},
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  notify("ui/notifications/initialized");
+  render();
+}).catch((err) => {
+  console.error("[teslamate] ui/initialize rejected by host:", err);
+  showState("The recap could not connect to the host.");
+});
+
+/* ---------- data handling ---------- */
+let row = null;
+let carName = null;
+
+function onToolInput(args) {
+  carName = args && args.car_name ? args.car_name : null;
+}
+
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the recap. " + text);
+    return;
+  }
+  row = extractRows(result).find((r) => typeof r.period === "string") || null;
+  if (!row) {
+    showState("Nothing to recap for this period.");
+    return;
+  }
+  document.getElementById("state").hidden = true;
+  document.getElementById("content").hidden = false;
+  document.getElementById("tableWrap").hidden = false;
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+function make(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+/* ---------- formatting ---------- */
+// Periods and days are local calendar dates; format them in UTC so a label
+// never shifts into the neighbouring day.
+const utc = (s) => new Date(s + (s.length === 4 ? "-01-01" : s.length === 7 ? "-01" : "") + "T00:00:00Z");
+const fmtYear = new Intl.DateTimeFormat(undefined, { year: "numeric", timeZone: "UTC" });
+const fmtMonth = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+const fmtMonthOnly = new Intl.DateTimeFormat(undefined, { month: "long", timeZone: "UTC" });
+const fmtDay = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", timeZone: "UTC" });
+function fmt(v, digits) {
+  return Number(v).toLocaleString(undefined, { maximumFractionDigits: digits || 0, minimumFractionDigits: 0 });
+}
+function compact(v) {
+  const n = Number(v);
+  return Math.abs(n) >= 10000
+    ? n.toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 1 })
+    : fmt(n, 0);
+}
+const has = (v) => v !== null && v !== undefined;
+// Reverse-geocoded addresses run long; the first two parts name the place.
+function place(s) {
+  if (!s) return "";
+  const parts = String(s).split(",").map((p) => p.trim()).filter(Boolean);
+  return parts.slice(0, 2).join(", ");
+}
+function plural(n, one, many) { return fmt(n, 0) + " " + (Number(n) === 1 ? one : many); }
+
+/* ---------- render ---------- */
+function render() {
+  if (!row) { reportSize(); return; }
+  const r = row;
+  const yearly = r.period.length === 4;
+  const periodLabel = yearly ? fmtYear.format(utc(r.period)) : fmtMonth.format(utc(r.period));
+  setText("title", (yearly ? "Your year" : "Your month") + " · " + periodLabel);
+  setText("subtitle", (r.in_progress ? "So far" : "Complete " + (yearly ? "year" : "month"))
+    + (carName ? ' · cars matching "' + carName + '"' : " · all cars"));
+
+  // Hero: the distance, with the change against the period before.
+  const hero = document.getElementById("hero");
+  const v = make("div", "v", compact(r.distance_km));
+  v.append(make("span", "u", "km"));
+  const l = make("div", "l");
+  l.append(document.createTextNode(plural(r.drives, "drive", "drives") + " on "
+    + plural(r.days_driven, "day", "days")));
+  if (has(r.distance_change_pct)) {
+    const pct = Number(r.distance_change_pct);
+    const d = make("span", "delta", (pct > 0 ? "▲ +" : pct < 0 ? "▼ " : "") + fmt(pct, 1) + "%");
+    l.append(document.createTextNode(" · "), d,
+      document.createTextNode(" vs " + (yearly ? "last year" : "last month") + (r.in_progress ? " at this point" : "")));
+  }
+  hero.replaceChildren(v, l);
+
+  // Tiles: label, value, detail.
+  const tiles = [
+    ["Driving time", fmt(r.driving_hours, 0) + " h", r.drives > 0 ? fmt((r.driving_hours * 60) / r.drives, 0) + " min per drive" : ""],
+    ["Consumption", has(r.wh_per_km) ? fmt(r.wh_per_km, 0) + " Wh/km" : "–", fmt(r.energy_used_kwh, 0) + " kWh used"],
+    ["Charged", compact(r.kwh_added) + " kWh", plural(r.charging_sessions, "session", "sessions")
+      + (r.dc_sessions ? " · " + fmt(r.dc_sessions, 0) + " DC" : "")],
+  ];
+  if (has(r.charging_cost)) {
+    tiles.push(["Charging cost", fmt(r.charging_cost, 0), r.distance_km > 0
+      ? fmt((r.charging_cost * 100) / r.distance_km, 2) + " per 100 km" : ""]);
+  }
+  if (has(r.odometer_km)) tiles.push(["Odometer", compact(r.odometer_km) + " km", "at the last drive"]);
+  if (r.software_updates) {
+    tiles.push(["Software", plural(r.software_updates, "update", "updates"), r.latest_version ? "latest " + r.latest_version : ""]);
+  }
+  document.getElementById("tiles").replaceChildren(...tiles.map(([label, value, detail]) => {
+    const t = make("div", "tile");
+    t.append(make("div", "l", label), make("div", "v", value));
+    if (detail) t.append(make("div", "d", detail));
+    return t;
+  }));
+
+  // Highlights: one line each, only those the data has.
+  const items = [];
+  if (has(r.longest_drive_km)) {
+    const route = [place(r.longest_drive_from), place(r.longest_drive_to)].filter(Boolean).join(" → ");
+    items.push(["Longest drive", [["b", fmt(r.longest_drive_km, 0) + " km"],
+      ["", " on " + fmtDay.format(utc(r.longest_drive_date)) + (route ? " · " + route : "")]]]);
+  }
+  if (has(r.busiest_day)) {
+    items.push(["Busiest day", [["b", fmtDay.format(utc(r.busiest_day))], ["", " · " + fmt(r.busiest_day_km, 0) + " km"]]]);
+  }
+  if (has(r.most_efficient)) {
+    const label = yearly ? fmtMonthOnly.format(utc(r.most_efficient)) : fmtDay.format(utc(r.most_efficient));
+    items.push(["Most efficient " + (yearly ? "month" : "day"), [["b", label], ["", " · " + fmt(r.most_efficient_wh_per_km, 0) + " Wh/km"]]]);
+  }
+  if (has(r.top_destination)) {
+    items.push(["Favourite destination", [["b", place(r.top_destination)], ["", " · " + plural(r.top_destination_arrivals, "arrival", "arrivals")]]]);
+  }
+  if (has(r.top_charging_location)) {
+    items.push(["Go-to charging spot", [["b", place(r.top_charging_location)], ["", " · " + plural(r.top_charging_location_sessions, "session", "sessions")]]]);
+  }
+  if (has(r.top_speed_kmh)) items.push(["Top speed", [["b", fmt(r.top_speed_kmh, 0) + " km/h"]]]);
+  if (has(r.coldest_drive_temp) && has(r.hottest_drive_temp)) {
+    items.push(["Temperature range", [["b", fmt(r.coldest_drive_temp, 1) + " °C"], ["", " to "], ["b", fmt(r.hottest_drive_temp, 1) + " °C"], ["", " on the road"]]]);
+  }
+  document.getElementById("hlTitle").hidden = !items.length;
+  document.getElementById("highlights").replaceChildren(...items.map(([key, parts]) => {
+    const li = make("li");
+    const body = make("div");
+    const t = make("div", "t");
+    for (const [tag, text] of parts) t.append(tag ? make(tag, null, text) : document.createTextNode(text));
+    body.append(make("div", "k", key), t);
+    li.append(make("span", "bar"), body);
+    return li;
+  }));
+
+  renderTable();
+  reportSize();
+}
+
+function renderTable() {
+  const table = make("table");
+  const head = make("tr");
+  head.append(make("th", null, "Field"), make("th", null, "Value"));
+  const thead = make("thead"); thead.append(head);
+  const tbody = make("tbody");
+  for (const [k, v] of Object.entries(row)) {
+    const tr = make("tr");
+    tr.append(make("td", null, k), make("td", null, has(v) ? String(v) : "–"));
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  document.getElementById("tableBox").replaceChildren(table);
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+new ResizeObserver(() => { reportSize(); })
+  .observe(document.getElementById("root"));
+document.getElementById("tableWrap").addEventListener("toggle", reportSize);
+</script>
+</body>
+</html>

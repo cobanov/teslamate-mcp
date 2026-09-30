@@ -197,17 +197,39 @@ def register_prompts(mcp: MCPServer) -> None:
     async def monthly_recap(month: str = "this month") -> str:
         return (
             f"Recap {month}:\n"
-            "1. Call `show_activity_report` with period='month' and the year and "
-            "month meant (leave them out for the current month).\n"
-            "2. Call `get_period_comparison` with days=30 for the change against "
-            "the 30 days before (for a past month, compare two "
-            "`get_activity_report` calls instead).\n"
-            "3. Call `get_visited_places` with days=31 for where the car went and "
-            "`get_charging_costs` with a start_date and end_date covering the "
-            "month for what charging cost.\n"
-            "4. Write a short recap: distance and drives, consumption and what "
-            "drove it (temperature, trips), energy charged and cost, the busiest "
-            "day, and the places visited most."
+            "1. Call `show_recap` with period='month' and the year and month meant "
+            "(leave them out for the current month) for the totals, the change "
+            "against the month before, and the highlights.\n"
+            "2. Call `get_activity_report` with the same period for the day-by-day "
+            "picture behind them.\n"
+            "3. Call `get_climate_usage` with months=1 (more for a past month) for "
+            "the climate run while parked.\n"
+            "4. Write a short recap: distance and drives and how that compares, "
+            "consumption and what drove it (temperature, trips, climate), energy "
+            "charged and cost, the busiest day, the longest drive, and the places "
+            "visited most."
+        )
+
+    @mcp.prompt(
+        name="year_in_review",
+        description="A year in review ('Wrapped'): totals, highlights, and records.",
+    )
+    async def year_in_review(year: str = "this year") -> str:
+        return (
+            f"Review {year}:\n"
+            "1. Call `show_recap` with period='year' and the year meant (leave it "
+            "out for the current year) for the totals, the change against the "
+            "year before, and the highlights.\n"
+            "2. Call `get_activity_report` with period='year' for the month by "
+            "month picture: the busiest and quietest months, and how consumption "
+            "followed the seasons.\n"
+            "3. Call `get_climate_usage` with months=12 for the climate run while "
+            "parked.\n"
+            "4. Write it like a year-end wrap-up: the headline distance and how it "
+            "compares, the longest drive and where it went, the favourite "
+            "destination and charging spot, the most efficient month, the "
+            "temperature extremes, and what charging cost. If the year is still "
+            "running, say so."
         )
 
     @mcp.prompt(

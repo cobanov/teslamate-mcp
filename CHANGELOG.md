@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **Climate run while parked**, from the climate state TeslaMate records in
+  its polled samples.
+  - `get_parked_climate_sessions`: each time the climate ran while parked
+    (preconditioning before a drive, cooling down after arriving, Keep
+    Climate / Dog / Camp mode), with minutes, estimated battery kWh, cooling
+    or heating, temperatures, set temperature, and where. Each sample stands
+    for the time until the next one, capped at 10 minutes and at the next
+    drive's start; plugged-in time counts toward duration but not battery
+    energy.
+  - `get_climate_usage`: the same per month, with the preconditioning count,
+    hours plugged in, and the energy's estimated cost at that month's average
+    recorded price.
+- **A year or month in review.** `get_recap` / `show_recap` (a new chart):
+  totals, the distance against the period before (cut at the same point while
+  the period is still running, so a year in progress is not measured against
+  a whole year), charging and cost, and highlights: the longest drive and
+  where it went, the busiest day, the most efficient day or month, the
+  favourite destination and charging spot, top speed, the temperature range,
+  and software updates. Defaults to the current year; `period='month'` for a
+  month.
+- `year_in_review` prompt; `monthly_recap` now starts from `show_recap` and
+  adds the climate used while parked.
+
 ## [0.13.5] - 2026-09-30
 
 ### Added

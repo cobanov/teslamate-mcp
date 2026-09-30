@@ -232,6 +232,27 @@ APP_SPECS: tuple[AppSpec, ...] = (
             "Prefer this when the user wants to SEE how temperature affects range."
         ),
     ),
+    AppSpec(
+        tool_name="show_recap",
+        query_name="get_recap",
+        base_uri="ui://teslamate/recap.html",
+        html_file="recap.html",
+        resource_name="recap_card",
+        resource_title="Year or month in review",
+        resource_description="A year or a month in review: totals and highlights.",
+        tool_description=(
+            "Render a year or a month in review ('Wrapped'), displayed directly in "
+            "the conversation: the distance with its change against the period "
+            "before, driving time, consumption, charging and cost, odometer and "
+            "software updates, and highlights (longest drive and where it went, "
+            "busiest day, most efficient day or month, favourite destination, "
+            "go-to charging spot, top speed, temperature range), with a data "
+            "table. Defaults to the current year; pass period='month' (and year, "
+            "month) for a month. Returns the same row as get_recap, so it also "
+            "works as a plain data tool. Prefer this when the user asks for a "
+            "year or month in review, a wrap-up, or 'Wrapped'."
+        ),
+    ),
 )
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri

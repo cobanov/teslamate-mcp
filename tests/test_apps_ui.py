@@ -32,6 +32,7 @@ _APP_ARGS = {
     "show_activity_report": {},  # every day of the current month, empty or not
     "show_visited_places": {},
     "show_efficiency_vs_temperature": {},
+    "show_recap": {},  # always one row, even for a quiet period
 }
 # Views that draw a basemap.
 _MAP_VIEWS = {"show_drive_route", "show_trip_route", "show_visited_places"}

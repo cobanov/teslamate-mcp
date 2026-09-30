@@ -34,7 +34,9 @@ def build_instructions(settings: Settings) -> str:
         "- Journeys: `get_trips` (TeslaMate ends a drive at every stop, so a journey "
         "is several drives). Single drives: `search_drives`, `get_drive_details`.",
         "- Not sleeping, battery lost while parked: `get_state_history`, "
-        "`get_idle_awake_periods`, `get_vampire_drain`.",
+        "`get_idle_awake_periods`, `get_vampire_drain`. Climate run while parked "
+        "(preconditioning, Keep Climate / Dog / Camp mode): "
+        "`get_parked_climate_sessions`, `get_climate_usage` (monthly).",
         "- Can I make it: `get_trip_energy_estimate` (take the distance from a maps "
         "tool); hills: `get_efficiency_by_elevation`.",
         "- Battery health: `get_battery_capacity_trend` (energy-based) first, then "
@@ -42,7 +44,8 @@ def build_instructions(settings: Settings) -> str:
         "- Charging: `search_charging_sessions`, `get_fast_charging_sessions`, "
         "`get_fast_charging_by_location`. Money: `get_charging_costs`, "
         "`get_charging_cost_estimates`, `get_fuel_savings`.",
-        "- Overviews: `get_activity_report` (a month or year), `get_period_comparison`.",
+        "- Overviews: `get_activity_report` (a month or year), `get_period_comparison`. "
+        "A year or month in review, 'Wrapped': `show_recap` / `get_recap`.",
         "- Anything else: `get_database_schema`, then a read-only `run_sql`.",
         "",
         "Charts: each show_* tool draws an interactive chart on clients that support "

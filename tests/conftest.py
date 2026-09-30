@@ -89,7 +89,7 @@ CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
     ideal_battery_range_km DOUBLE PRECISION, est_battery_range_km DOUBLE PRECISION,
     odometer DOUBLE PRECISION, outside_temp DOUBLE PRECISION, is_climate_on BOOLEAN,
-    speed SMALLINT, power SMALLINT, drive_id INTEGER, elevation SMALLINT,
+    inside_temp DOUBLE PRECISION, driver_temp_setting DOUBLE PRECISION, speed SMALLINT, power SMALLINT, drive_id INTEGER, elevation SMALLINT,
     tpms_pressure_fl DOUBLE PRECISION, tpms_pressure_fr DOUBLE PRECISION,
     tpms_pressure_rl DOUBLE PRECISION, tpms_pressure_rr DOUBLE PRECISION);
 CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
@@ -407,12 +407,61 @@ SELECT 403, cp.start_date + interval '22 min', 60, 0, NULL, FALSE, NULL, 'ACSing
 FROM charging_processes cp WHERE cp.id = 403;
 """
 
+# Car 12 ("Chiller") for the parked-climate tools. Day D is three UTC days back.
+# Drives 501 (08:00-08:30), 502 (18:00-18:30) and 503 (D+1 09:00) bound two
+# parks. Polled samples (climate state set) make four climate sessions:
+#   08:31-08:37  after_drive, cooling (30 °C out, 22 set), 2 kW: 6 min, 0.2 kWh
+#   12:00-12:20  parked (Dog mode), cooling, 3 kW; the last sample's credit is
+#                capped at 10 min: 20 min, 1.0 kWh
+#   17:50-18:00  before_drive, heating (5 °C out, 21 set), 4 kW; cut at the
+#                drive's start: 10 min, 0.67 kWh
+#   18:45-19:00  plugged in (charge 18:40-20:00, 0.50 per kWh): 15 min, 0 kWh
+_CLIMATE_SQL = """
+INSERT INTO car_settings (id) VALUES (12);
+INSERT INTO cars VALUES (12, 'Chiller', 'model3', 'LR', 'White', 'Model 3 LR', 12, 0.15);
+INSERT INTO addresses VALUES (40, 'Chiller Home', 'Izmir', 'TR-35', 38.4, 27.1),
+                             (41, 'Chiller Office', 'Izmir', 'TR-35', 38.45, 27.2);
+CREATE TEMP TABLE base AS
+    SELECT date_trunc('day', now() AT TIME ZONE 'UTC') - interval '3 days' AS d;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, start_address_id,
+    end_address_id, start_rated_range_km, end_rated_range_km)
+SELECT 501, 12, d + interval '8 hours', d + interval '8.5 hours', 20.0, 30, 40, 41, 400.0, 380.0
+FROM base
+UNION ALL SELECT 502, 12, d + interval '18 hours', d + interval '18.5 hours', 20.0, 30, 41, 40,
+    375.0, 355.0 FROM base
+UNION ALL SELECT 503, 12, d + interval '33 hours', d + interval '33.3 hours', 10.0, 20, 40, 41,
+    350.0, 340.0 FROM base;
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    charge_energy_used, duration_min, cost, address_id)
+SELECT 501, 12, d + interval '18 hours 40 minutes', d + interval '20 hours', 20.0, 20.0, 80,
+    10.00, 40 FROM base;
+INSERT INTO positions (car_id, date, latitude, longitude, is_climate_on, power, outside_temp,
+    inside_temp, driver_temp_setting)
+SELECT 12, d + v.at, 38.4, 27.1, v.on_, v.kw, v.outside, 25.0, v.setpoint
+FROM base
+    CROSS JOIN (VALUES
+        (interval '8 hours 31 minutes', TRUE, 2, 30.0, 22.0),
+        (interval '8 hours 34 minutes', TRUE, 2, 30.0, 22.0),
+        (interval '8 hours 37 minutes', FALSE, 0, 30.0, 22.0),
+        (interval '12 hours', TRUE, 3, 30.0, 22.0),
+        (interval '12 hours 5 minutes', TRUE, 3, 30.0, 22.0),
+        (interval '12 hours 10 minutes', TRUE, 3, 30.0, 22.0),
+        (interval '12 hours 20 minutes', FALSE, 0, 30.0, 22.0),
+        (interval '17 hours 50 minutes', TRUE, 4, 5.0, 21.0),
+        (interval '17 hours 55 minutes', TRUE, 4, 5.0, 21.0),
+        (interval '18 hours 45 minutes', TRUE, -10, 20.0, 22.0),
+        (interval '18 hours 50 minutes', TRUE, -10, 20.0, 22.0)
+    ) AS v(at, on_, kw, outside, setpoint);
+DROP TABLE base;
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
     "estimate": _ESTIMATE_SQL,
     "costs": _COST_SQL,
     "fast": _FAST_SQL,
+    "climate": _CLIMATE_SQL,
 }
 
 

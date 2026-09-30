@@ -84,3 +84,62 @@ async def test_drive_efficiency_points(mcp_session) -> None:
     assert [r["start_date"] for r in newest] == sorted(
         (r["start_date"] for r in newest), reverse=True
     )
+
+
+async def test_recap_month(mcp_session) -> None:
+    async with mcp_session(with_trips=True) as session:
+        rows = await _rows(
+            session, "get_recap", period="month", year=2025, month=6, car_name="road tripper"
+        )
+
+    assert len(rows) == 1
+    r = rows[0]
+    assert (r["period"], r["period_start"], r["period_end"], r["in_progress"]) == (
+        "2025-06",
+        "2025-06-01",
+        "2025-06-30",
+        False,
+    )
+    assert (r["drives"], r["distance_km"], r["days_driven"]) == (5, 389.0, 2)
+    assert (r["energy_used_kwh"], r["wh_per_km"]) == (49.3, 127)
+    # No drives in May 2025, so there is nothing to compare against.
+    assert (r["previous_distance_km"], r["distance_change_pct"]) == (None, None)
+    assert (r["charging_sessions"], r["dc_sessions"], r["kwh_added"]) == (2, 0, 75.0)
+    assert r["charging_cost"] is None
+    assert (r["longest_drive_km"], r["longest_drive_date"]) == (150.0, "2025-06-10")
+    assert (r["longest_drive_from"], r["longest_drive_to"]) == (
+        "Supercharger Bolu",
+        "Kizilay Square",
+    )
+    assert (r["busiest_day"], r["busiest_day_km"]) == ("2025-06-10", 360.0)
+    assert (r["most_efficient"], r["most_efficient_wh_per_km"]) == ("2025-06-10", 127)
+    assert (r["top_destination"], r["top_destination_arrivals"]) == ("Kizilay Square", 2)
+    # Two places with one session each: the tie goes to the first name.
+    assert (r["top_charging_location"], r["top_charging_location_sessions"]) == (
+        "Kizilay Square",
+        1,
+    )
+    assert (r["top_speed_kmh"], r["coldest_drive_temp"], r["hottest_drive_temp"]) == (
+        130,
+        20.0,
+        26.0,
+    )
+    assert (r["software_updates"], r["latest_version"]) == (0, None)
+
+
+async def test_recap_year_and_default(mcp_session) -> None:
+    async with mcp_session(with_trips=True) as session:
+        year = await _rows(session, "get_recap", year=2025, car_name="road tripper")
+        current = await _rows(session, "get_recap")
+        quiet = await _rows(session, "get_recap", year=2001)
+
+    assert (year[0]["period"], year[0]["distance_km"]) == ("2025", 389.0)
+    assert year[0]["most_efficient"] == "2025-06"
+    assert current[0]["in_progress"] is True
+    assert current[0]["drives"] >= 3  # the base seed's recent drives
+    assert current[0]["software_updates"] >= 0
+    assert (quiet[0]["drives"], quiet[0]["distance_km"], quiet[0]["longest_drive_km"]) == (
+        0,
+        0.0,
+        None,
+    )
