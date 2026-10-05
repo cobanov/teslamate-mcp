@@ -17,6 +17,9 @@ SELECT d.id AS drive_id,
     d.start_rated_range_km,
     d.end_rated_range_km,
     (d.start_rated_range_km - d.end_rated_range_km) AS rated_range_used_km,
+    d.start_ideal_range_km,
+    d.end_ideal_range_km,
+    (d.start_ideal_range_km - d.end_ideal_range_km) AS ideal_range_used_km,
     ROUND(
         ((d.start_rated_range_km - d.end_rated_range_km) / NULLIF(d.distance, 0) * 100)::numeric,
         1
@@ -24,9 +27,13 @@ SELECT d.id AS drive_id,
     start_addr.display_name AS start_location,
     start_addr.city AS start_city,
     end_addr.display_name AS end_location,
-    end_addr.city AS end_city
+    end_addr.city AS end_city,
+    start_fence.name AS start_geofence,
+    end_fence.name AS end_geofence
 FROM drives d
     JOIN cars c ON d.car_id = c.id
     LEFT JOIN addresses start_addr ON d.start_address_id = start_addr.id
     LEFT JOIN addresses end_addr ON d.end_address_id = end_addr.id
+    LEFT JOIN geofences start_fence ON d.start_geofence_id = start_fence.id
+    LEFT JOIN geofences end_fence ON d.end_geofence_id = end_fence.id
 WHERE d.id = %(drive_id)s::int;
