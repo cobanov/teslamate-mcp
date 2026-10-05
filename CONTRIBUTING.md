@@ -5,7 +5,7 @@ Thanks for considering a contribution to `teslamate-mcp`. This guide should get 
 ## Setup
 
 ```bash
-git clone https://github.com/batubozkan/teslamate-mcp.git
+git clone https://github.com/cobanov/teslamate-mcp.git
 cd teslamate-mcp
 cp env.example .env   # set at least DATABASE_URL
 uv sync               # installs runtime + dev dependencies

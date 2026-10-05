@@ -7,14 +7,13 @@
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
 This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 11 prompts, and interactive charts.
 
-[![CI](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/batubozkan/teslamate-mcp/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/batubozkan/teslamate-mcp?logo=github&sort=semver)](https://github.com/batubozkan/teslamate-mcp/releases)
-[![GHCR](https://img.shields.io/badge/ghcr.io-batubozkan%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/batubozkan/teslamate-mcp/pkgs/container/teslamate-mcp)
+[![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
+[![GHCR](https://img.shields.io/badge/ghcr.io-cobanov%2Fteslamate--mcp-2496ED?logo=docker)](https://github.com/cobanov/teslamate-mcp/pkgs/container/teslamate-mcp)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/github/license/batubozkan/teslamate-mcp)](LICENSE)
+[![License](https://img.shields.io/github/license/cobanov/teslamate-mcp)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-This is a fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp). It adds the 0.4.0+ feature line.
 
 </div>
 
@@ -49,7 +48,7 @@ This is a fork of [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-m
 1. Install:
 
    ```bash
-   git clone https://github.com/batubozkan/teslamate-mcp.git
+   git clone https://github.com/cobanov/teslamate-mcp.git
    cd teslamate-mcp
    cp env.example .env      # set DATABASE_URL
    uv sync
@@ -80,7 +79,7 @@ The MCP endpoint is `http://localhost:8888/mcp`. The health probe is `http://loc
 A multi-arch image (`linux/amd64`, `linux/arm64`) is published to GHCR on each release:
 
 ```bash
-docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/batubozkan/teslamate-mcp:latest
+docker run --rm -e DATABASE_URL=... -p 8888:8888 ghcr.io/cobanov/teslamate-mcp:latest
 ```
 
 ## Deploy on Unraid, behind Cloudflare
@@ -272,7 +271,7 @@ The startup validation rejects a query when a declared parameter is missing from
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
 - The maps' basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area being viewed. `MAP_TILES=false` turns this off.
 - The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
-- Report vulnerabilities through [private security advisories](https://github.com/batubozkan/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
+- Report vulnerabilities through [private security advisories](https://github.com/cobanov/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
 ## Development
 
