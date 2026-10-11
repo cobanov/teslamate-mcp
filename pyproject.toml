@@ -45,9 +45,9 @@ dependencies = [
 teslamate-mcp = "teslamate_mcp.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/batubozkan/teslamate-mcp"
-Repository = "https://github.com/batubozkan/teslamate-mcp"
-Issues = "https://github.com/batubozkan/teslamate-mcp/issues"
+Homepage = "https://github.com/cobanov/teslamate-mcp"
+Repository = "https://github.com/cobanov/teslamate-mcp"
+Issues = "https://github.com/cobanov/teslamate-mcp/issues"
 Upstream = "https://github.com/cobanov/teslamate-mcp"
 
 [build-system]
