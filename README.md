@@ -14,6 +14,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serve
 [![License](https://img.shields.io/github/license/cobanov/teslamate-mcp)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
+**[Documentation](https://github.com/cobanov/teslamate-mcp/wiki)** · [Tool reference](https://github.com/cobanov/teslamate-mcp/wiki/Tool-Reference) · [Configuration](https://github.com/cobanov/teslamate-mcp/wiki/Configuration) · [Deployment](https://github.com/cobanov/teslamate-mcp/wiki/Deployment)
 
 </div>
 
@@ -284,4 +285,4 @@ uv run pytest                    # database tests need Docker or TESLAMATE_TEST_
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Based on [cobanov/teslamate-mcp](https://github.com/cobanov/teslamate-mcp) by Mert Cobanov.
+MIT — see [LICENSE](LICENSE).
