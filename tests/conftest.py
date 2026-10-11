@@ -69,6 +69,7 @@ CREATE TABLE drives (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAM
     inside_temp_avg DOUBLE PRECISION, outside_temp_avg DOUBLE PRECISION,
     start_address_id BIGINT, end_address_id BIGINT,
     start_rated_range_km DOUBLE PRECISION, end_rated_range_km DOUBLE PRECISION,
+    start_ideal_range_km DOUBLE PRECISION, end_ideal_range_km DOUBLE PRECISION,
     start_position_id INTEGER, end_position_id INTEGER,
     start_geofence_id BIGINT, end_geofence_id BIGINT, ascent SMALLINT, descent SMALLINT);
 CREATE TABLE charging_processes (id SERIAL PRIMARY KEY, car_id SMALLINT, start_date TIMESTAMP,
@@ -89,7 +90,10 @@ CREATE TABLE positions (id SERIAL PRIMARY KEY, car_id SMALLINT, date TIMESTAMP,
     usable_battery_level SMALLINT, rated_battery_range_km DOUBLE PRECISION,
     ideal_battery_range_km DOUBLE PRECISION, est_battery_range_km DOUBLE PRECISION,
     odometer DOUBLE PRECISION, outside_temp DOUBLE PRECISION, is_climate_on BOOLEAN,
-    inside_temp DOUBLE PRECISION, driver_temp_setting DOUBLE PRECISION, speed SMALLINT, power SMALLINT, drive_id INTEGER, elevation SMALLINT,
+    inside_temp DOUBLE PRECISION, driver_temp_setting DOUBLE PRECISION,
+    passenger_temp_setting DOUBLE PRECISION, fan_status INTEGER,
+    is_front_defroster_on BOOLEAN, is_rear_defroster_on BOOLEAN,
+    speed SMALLINT, power SMALLINT, drive_id INTEGER, elevation SMALLINT,
     tpms_pressure_fl DOUBLE PRECISION, tpms_pressure_fr DOUBLE PRECISION,
     tpms_pressure_rl DOUBLE PRECISION, tpms_pressure_rr DOUBLE PRECISION);
 CREATE TABLE updates (id SERIAL PRIMARY KEY, car_id SMALLINT, version TEXT,
@@ -129,7 +133,8 @@ INSERT INTO drives (car_id, start_date, end_date, distance, duration_min, speed_
      7.0, 14, 70, 90, -25, 1508.0, 1515.0, 21.0, 20.0, 1, 2, 335.0, 328.0);
 INSERT INTO geofences (id, name, latitude, longitude, radius, cost_per_unit, session_fee,
     billing_type) VALUES
-    (1, 'Home', 41.0, 29.0, 25, 0.28, NULL, 'per_kwh');
+    (1, 'Home', 41.0, 29.0, 25, 0.28, NULL, 'per_kwh'),
+    (2, 'Depot', 41.05, 29.05, 300, 0.10, 1.50, 'per_minute');
 INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
     duration_min, cost, address_id, geofence_id, start_battery_level, end_battery_level,
     charge_energy_used) VALUES
@@ -175,7 +180,11 @@ SELECT 1, TIMESTAMP '2026-01-15 22:30:00' + (n * 3 || ' minutes')::interval,
        41.0 + 0.007 * n, 29.0 + 0.005 * n, 80 - n, 79 - n,
        800.0 + 3.8 * n, 40 + 5 * n, 20 + n, 100 + 10 * n
 FROM generate_series(0, 11) AS n;
-UPDATE drives SET ascent = 120, descent = 10 WHERE id = 4;
+UPDATE drives SET ascent = 120, descent = 10,
+    start_ideal_range_km = 510.0, end_ideal_range_km = 480.0,
+    start_geofence_id = 1
+WHERE id = 4;
+UPDATE charges SET conn_charge_cable = 'IEC' WHERE charging_process_id = 1;
 INSERT INTO updates (car_id, version, start_date, end_date) VALUES
     (1, '2026.20.1', now() - interval '5 days', now() - interval '5 days' + interval '25 min');
 """
@@ -527,6 +536,52 @@ INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_
     (702, 14, TIMESTAMP '2025-03-01 11:00', TIMESTAMP '2025-03-01 11:00', 0.0, 0, 1, 70, 70);
 """
 
+# Car 15 ("Poller") for the climate and tire columns of get_current_car_status.
+# Its latest row is an in-drive sample with neither. Polled rows carry an ideal
+# range, as in TeslaMate. Climate comes from a polled row 3 hours back, the
+# tires from one 2 hours back, and a 9-day-old row with both sits outside the
+# 7-day search.
+_STATUS_SQL = """
+INSERT INTO car_settings (id) VALUES (15);
+INSERT INTO cars VALUES (15, 'Poller', 'model3', 'LR', 'White', 'Model 3 LR', 15, 0.15);
+INSERT INTO positions (car_id, date, battery_level, odometer, ideal_battery_range_km,
+    inside_temp, driver_temp_setting, passenger_temp_setting, fan_status,
+    is_front_defroster_on, is_rear_defroster_on,
+    tpms_pressure_fl, tpms_pressure_fr, tpms_pressure_rl, tpms_pressure_rr) VALUES
+    (15, now() - interval '9 days', 90, 2000.0, 450.0, 10.0, 18.0, 18.0, 1, TRUE, TRUE,
+     2.0, 2.0, 2.0, 2.0),
+    (15, now() - interval '3 hours', 75, 2100.0, 375.0, 22.5, 21.0, 20.5, 3, FALSE, TRUE,
+     NULL, NULL, NULL, NULL),
+    (15, now() - interval '2 hours', 74, 2100.0, 370.0, NULL, NULL, NULL, NULL, NULL, NULL,
+     2.9, 3.0, 2.8, 2.9),
+    (15, now() - interval '10 minutes', 70, 2130.0, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+     NULL, NULL, NULL, NULL);
+"""
+
+# Car 16 ("Gapper") for get_logging_gaps, on UTC times like TeslaMate. One
+# drive open for 3 days and one charge open for 2 hours. Position holes:
+#   A-B  72 h, odometer +100 km: a drive TeslaMate missed
+#   B-C   2 h, battery 70 -> 90: a charge TeslaMate missed
+#   C-D  96 h, battery 90 -> 86, odometer the same: parked, idle drain
+#   D-E  69 h, no change: parked
+_GAPS_SQL = """
+INSERT INTO car_settings (id) VALUES (16);
+INSERT INTO cars VALUES (16, 'Gapper', 'model3', 'LR', 'White', 'Model 3 LR', 16, 0.15);
+INSERT INTO drives (car_id, start_date, end_date) VALUES
+    (16, (now() AT TIME ZONE 'UTC') - interval '3 days', NULL);
+INSERT INTO charging_processes (car_id, start_date, end_date) VALUES
+    (16, (now() AT TIME ZONE 'UTC') - interval '2 hours', NULL);
+INSERT INTO positions (car_id, date, odometer, battery_level)
+SELECT 16, (now() AT TIME ZONE 'UTC') - v.ago, v.km, v.level
+FROM (VALUES
+        (interval '10 days', 1000.0, 80),
+        (interval '7 days', 1100.0, 70),
+        (interval '7 days' - interval '2 hours', 1100.0, 90),
+        (interval '3 days' - interval '2 hours', 1100.0, 86),
+        (interval '1 hour', 1100.0, 86)
+    ) AS v(ago, km, level);
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -536,6 +591,8 @@ _EXTRA_SEEDS = {
     "climate": _CLIMATE_SQL,
     "routes": _ROUTES_SQL,
     "stops": _STOPS_SQL,
+    "status": _STATUS_SQL,
+    "gaps": _GAPS_SQL,
 }
 
 

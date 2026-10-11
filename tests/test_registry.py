@@ -16,7 +16,7 @@ _DUMMY_DB_URL = "postgresql://teslamate:secret@example.test/teslamate"
 def test_discover_finds_all_bundled_tools() -> None:
     tools = discover_predefined_tools()
     names = {t.name for t in tools}
-    assert len(tools) == 53
+    assert len(tools) == 56
     # Spot-check that a few expected tools are present.
     assert "get_basic_car_information" in names
     assert "get_battery_health_summary" in names
@@ -51,11 +51,12 @@ def test_each_tool_has_nonempty_metadata() -> None:
 def test_every_tool_accepts_a_car_scope_or_is_id_scoped() -> None:
     # Every predefined report should be filterable by car unless it targets a
     # single entity by id (drive/charging session detail tools) or reads a
-    # TeslaMate-wide setting.
-    global_settings = {"get_unit_preferences"}
+    # TeslaMate-wide row.
+    global_settings = {"get_unit_preferences", "get_geofences"}
     id_scoped = {
         "get_drive_details",
         "get_charging_curve",
+        "get_charging_session",
         "get_drive_route",
         "get_trip_details",
         "get_trip_route",
