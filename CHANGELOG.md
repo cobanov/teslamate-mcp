@@ -4,6 +4,29 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **`get_efficiency_by_speed`**: consumption per speed band, from the samples
+  TeslaMate logs while driving (power x time over speed x time), with the
+  distance and hours in each band and the difference from the car's most
+  efficient band. Optionally only drives near a given outside temperature.
+  This is battery power while moving, so it reads lower than the rated-range
+  consumption of the drive tools: the bands compare with each other.
+- **`get_charging_time_estimate`** ("how long will the stop take?"): minutes
+  from one battery % to another per charger type (Supercharger, other fast
+  charger, AC), from the time past sessions spent at each battery percent, so
+  the taper and AC losses are in it. Returns a typical and a slow (90th
+  percentile) figure, the kWh added, and the battery band the history covers;
+  no time when a percent on the way has no history.
+- **`get_frequent_routes`**: the routes a car drives again and again, each
+  direction on its own, with typical distance and duration, the fastest and
+  slowest run, consumption, and the usual departure hour;
+  `by_departure_hour=true` gives a row per departure hour. Places are
+  geofences, or areas about twice `place_radius_m` across, because TeslaMate
+  resolves parking spots a few metres apart to different addresses.
+- `get_trip_energy_estimate` takes `avg_speed_kmh`: only past drives that
+  averaged within 15 km/h of it, which is finer than `highway`.
+- The `plan_trip` prompt passes the average speed and times the charging stop.
+
 ## [0.14.0] - 2026-09-30
 
 ### Added

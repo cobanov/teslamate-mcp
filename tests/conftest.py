@@ -455,6 +455,50 @@ FROM base
 DROP TABLE base;
 """
 
+# Car 13 commutes between a home with two parking spots 130 m apart (two
+# TeslaMate addresses, one place at the default place_radius_m) and an office:
+# four drives out (three leaving at 08, one at 09), three back at 18, and one
+# trip to a cabin. The cabin drive carries an hour of samples for
+# get_efficiency_by_speed: 25 km at 50 km/h and 6 kW (120 Wh/km), then 59 km
+# at 120 km/h and 24 kW (200 Wh/km).
+_ROUTES_SQL = """
+INSERT INTO car_settings (id) VALUES (13);
+INSERT INTO cars VALUES (13, 'Commuter', 'model3', 'LR', 'Grey', 'Model 3 LR', 13, 0.15);
+INSERT INTO addresses VALUES (50, 'Commuter Home', 'Ankara', 'TR-06', 39.9, 32.8),
+                             (51, 'Commuter Garage', 'Ankara', 'TR-06', 39.9012, 32.8),
+                             (52, 'Commuter Office', 'Ankara', 'TR-06', 39.95, 32.85),
+                             (53, 'Commuter Cabin', 'Bolu', 'TR-14', 40.5, 33.5);
+INSERT INTO positions (id, car_id, date, latitude, longitude) VALUES
+    (9001, 13, now() - interval '400 days', 39.9, 32.8),
+    (9002, 13, now() - interval '400 days', 39.9012, 32.8),
+    (9003, 13, now() - interval '400 days', 39.95, 32.85),
+    (9004, 13, now() - interval '400 days', 40.5, 33.5);
+CREATE TEMP TABLE base AS SELECT date_trunc('day', now() AT TIME ZONE 'UTC') AS d;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, outside_temp_avg,
+    start_address_id, end_address_id, start_position_id, end_position_id,
+    start_rated_range_km, end_rated_range_km)
+SELECT v.id, 13, d - v.ago + v.at, d - v.ago + v.at + make_interval(mins => v.minutes), v.km,
+    v.minutes, 20.0, v.from_address, v.to_address, v.from_position, v.to_position, 400.0,
+    400.0 - v.rated_used
+FROM base
+    CROSS JOIN (VALUES
+        (601, interval '1 day', interval '8 hours 10 minutes', 30, 20.0, 50, 52, 9001, 9003, 16.0),
+        (602, interval '2 days', interval '8 hours 20 minutes', 34, 20.0, 50, 52, 9001, 9003, 16.0),
+        (603, interval '3 days', interval '8 hours 40 minutes', 40, 20.0, 51, 52, 9002, 9003, 16.0),
+        (604, interval '4 days', interval '9 hours 5 minutes', 32, 22.0, 50, 52, 9001, 9003, 17.6),
+        (605, interval '1 day', interval '18 hours 5 minutes', 35, 20.0, 52, 50, 9003, 9001, 24.0),
+        (606, interval '2 days', interval '18 hours 30 minutes', 45, 20.0, 52, 51, 9003, 9002, 24.0),
+        (607, interval '3 days', interval '18 hours 15 minutes', 38, 20.0, 52, 50, 9003, 9001, 24.0),
+        (608, interval '5 days', interval '10 hours', 180, 150.0, 52, 53, 9003, 9004, 200.0)
+    ) AS v(id, ago, at, minutes, km, from_address, to_address, from_position, to_position,
+        rated_used);
+INSERT INTO positions (car_id, date, drive_id, speed, power)
+SELECT 13, d - interval '5 days' + interval '10 hours' + make_interval(secs => 30 * n), 608,
+    CASE WHEN n < 60 THEN 50 ELSE 120 END, CASE WHEN n < 60 THEN 6 ELSE 24 END
+FROM base CROSS JOIN generate_series(0, 119) AS n;
+DROP TABLE base;
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -462,6 +506,7 @@ _EXTRA_SEEDS = {
     "costs": _COST_SQL,
     "fast": _FAST_SQL,
     "climate": _CLIMATE_SQL,
+    "routes": _ROUTES_SQL,
 }
 
 

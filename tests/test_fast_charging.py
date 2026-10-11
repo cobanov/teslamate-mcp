@@ -113,5 +113,6 @@ def test_every_dc_classification_uses_the_same_test() -> None:
         "charging_cost_estimates.sql",
         "charging_curve_comparison.sql",
         "charging_efficiency.sql",
+        "charging_time_estimate.sql",
     ):
         assert _DC_TEST in " ".join(_sql(name).split()).replace("( ", "(").replace(" )", ")"), name

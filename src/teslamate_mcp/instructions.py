@@ -32,13 +32,16 @@ def build_instructions(settings: Settings) -> str:
         "- Where is the car, is it charging or asleep: `get_current_car_status`. What "
         "it did on a day or week: `get_timeline`.",
         "- Journeys: `get_trips` (TeslaMate ends a drive at every stop, so a journey "
-        "is several drives). Single drives: `search_drives`, `get_drive_details`.",
+        "is several drives). Single drives: `search_drives`, `get_drive_details`. "
+        "A commute or any route driven again and again: `get_frequent_routes`.",
         "- Not sleeping, battery lost while parked: `get_state_history`, "
         "`get_idle_awake_periods`, `get_vampire_drain`. Climate run while parked "
         "(preconditioning, Keep Climate / Dog / Camp mode): "
         "`get_parked_climate_sessions`, `get_climate_usage` (monthly).",
-        "- Can I make it: `get_trip_energy_estimate` (take the distance from a maps "
-        "tool); hills: `get_efficiency_by_elevation`.",
+        "- Can I make it: `get_trip_energy_estimate` (take the distance, and the "
+        "average speed, from a maps tool); how long the charging stop takes: "
+        "`get_charging_time_estimate`; hills: `get_efficiency_by_elevation`; what "
+        "driving faster costs: `get_efficiency_by_speed`.",
         "- Battery health: `get_battery_capacity_trend` (energy-based) first, then "
         "`get_battery_degradation_over_time`.",
         "- Charging: `search_charging_sessions`, `get_fast_charging_sessions`, "

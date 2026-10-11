@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 61 tools, 12 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 64 tools, 12 prompts, and interactive charts.
 
 [![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
@@ -27,10 +27,11 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serve
 - "Can I reach Ankara (450 km) at 5°C without charging?" — the server estimates the arrival battery % from your own drives at that temperature.
 - "Why isn't my car sleeping?" — the server reads TeslaMate's state log and lists the periods the car stayed awake while parked.
 - "What did my car do on Saturday?" — one call returns the drives, charges, and parked time in order.
+- "How long will the charging stop take, and when should I leave for work?" — the server times a charge from your own past sessions, and finds the routes you drive again and again.
 
 ## Highlights
 
-- **50 SQL report tools.** Battery capacity and degradation, sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, range estimates, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
+- **53 SQL report tools.** Battery capacity and degradation, sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, frequent routes, range and charging-time estimates, consumption by speed, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
 - **9 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a year- or month-in-review card, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
 - **Guidance for the assistant.** MCP instructions and 12 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
 - **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
@@ -105,17 +106,17 @@ Tools return metric values (km, km/h, °C, bar, m) and rated range. `get_unit_pr
 
 The server also sends MCP `instructions`: how to read units, time zones and costs, and which tool answers which kind of question.
 
-### Reports (22)
+### Reports (24)
 
 | Group | Tools |
 |---|---|
 | Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`, `get_unit_preferences` |
 | Battery | `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends` |
-| Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`, `get_visited_places` |
-| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |
+| Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`, `get_visited_places`, `get_frequent_routes` |
+| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_efficiency_by_speed`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |
 | Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
 
-### Insights (11)
+### Insights (12)
 
 | Tool | What it returns |
 |---|---|
@@ -129,7 +130,8 @@ The server also sends MCP `instructions`: how to read units, time zones and cost
 | `get_recap` | A year or month in review in one row: totals, distance against the period before (cut at the same point while it runs), charging and cost, and highlights: longest drive, busiest day, most efficient day or month, favourite destination and charging spot, top speed, temperature range, software updates |
 | `get_parked_climate_sessions` | Times the climate ran while parked (preconditioning, cooling down after arriving, Keep Climate / Dog / Camp mode): minutes, estimated battery kWh, cooling or heating, temperatures, and where |
 | `get_climate_usage` | The same per month: sessions, preconditioning count, hours, hours plugged in, estimated kWh and cost |
-| `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only), with a conservative figure and the arrival battery % |
+| `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only, or drives at a given average speed), with a conservative figure and the arrival battery % |
+| `get_charging_time_estimate` | "How long will the stop take?": minutes from one battery % to another per charger type (Supercharger, other fast charger, AC), from the time past sessions spent at each percent, with a slow figure and the kWh added |
 
 ### Timeline and car state (3)
 

@@ -1,0 +1,68 @@
+name = "get_efficiency_by_speed"
+description = "How speed changes consumption: the samples TeslaMate logs while driving, grouped into speed bands (10 km/h wide by default, open-ended from 150 km/h), per car, with the distance and hours driven in each band, consumption in Wh/km, and the difference from the car's most efficient band in percent. Answers 'how much more do I use at 130 than at 110?'. The figure is power at the battery while moving (power x time over speed x time), so it leaves out energy used while stopped and reads lower than the rated-range consumption the drive and trip tools report: compare the bands with each other, and do not mix them with get_trip_energy_estimate figures. Samples under 10 km/h are left out. Pass outside_temp_c to keep the season from colouring the comparison."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days of driving to read. Longer windows read more samples and take longer."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "band_kmh"
+type = "integer"
+description = "Width of each speed band in km/h."
+default = 10
+minimum = 5
+maximum = 30
+
+[[params]]
+name = "outside_temp_c"
+type = "number"
+description = "Only drives whose average outside temperature was within 5°C of this. Omit for all temperatures."
+minimum = -40
+maximum = 55
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "speed_band"
+type = "string"
+description = "The band's speed range, for example '110-120 km/h'."
+
+[[output]]
+name = "speed_from_kmh"
+type = "integer"
+description = "Lower edge of the band."
+
+[[output]]
+name = "distance_km"
+type = "number"
+description = "Distance driven at speeds in this band."
+
+[[output]]
+name = "hours"
+type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Battery power while moving, per km; lower than rated-range consumption."
+
+[[output]]
+name = "vs_best_pct"
+type = "number"
+description = "Difference from the car's most efficient band with at least 20 km, in percent."
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+description = "Distance-weighted average outside temperature of the drives behind the band, in °C."

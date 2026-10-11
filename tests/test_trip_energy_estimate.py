@@ -59,3 +59,15 @@ async def test_estimate_highway_and_start_soc(mcp_session) -> None:
     assert (full["start_soc"], full["start_soc_as_of"]) == (100, None)
     assert full["arrival_soc_pct"] == 10.0
     assert now["arrival_soc_pct"] == -10.0  # from the recorded 80%: needs a charging stop
+
+
+async def test_estimate_narrows_to_the_average_speed(mcp_session) -> None:
+    async with mcp_session(seeds=["estimate"]) as session:
+        motorway = await _estimate(session, distance_km=100, outside_temp_c=20, avg_speed_kmh=100)
+        city = await _estimate(session, distance_km=100, outside_temp_c=20, avg_speed_kmh=30)
+        any_speed = await _estimate(session, distance_km=100, outside_temp_c=20)
+
+    # Motorway drives averaged 100 km/h, city drives 30 km/h.
+    assert (motorway["drives_used"], motorway["wh_per_km_expected"]) == (5, 180)
+    assert (city["drives_used"], city["wh_per_km_expected"]) == (5, 150)
+    assert (motorway["avg_speed_kmh"], any_speed["avg_speed_kmh"]) == (100, None)
