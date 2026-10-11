@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 64 tools, 12 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 67 tools, 12 prompts, and interactive charts.
 
 [![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
@@ -31,7 +31,7 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serve
 
 ## Highlights
 
-- **53 SQL report tools.** Battery capacity and degradation, sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, frequent routes, range and charging-time estimates, consumption by speed, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
+- **56 SQL report tools.** Battery capacity and degradation, sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, frequent routes, range and charging-time estimates, consumption by speed, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
 - **9 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a year- or month-in-review card, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
 - **Guidance for the assistant.** MCP instructions and 12 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
 - **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
@@ -133,27 +133,29 @@ The server also sends MCP `instructions`: how to read units, time zones and cost
 | `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only, or drives at a given average speed), with a conservative figure and the arrival battery % |
 | `get_charging_time_estimate` | "How long will the stop take?": minutes from one battery % to another per charger type (Supercharger, other fast charger, AC), from the time past sessions spent at each percent, with a slow figure and the kWh added |
 
-### Timeline and car state (3)
+### Timeline and car state (4)
 
-TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now.
+TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now. It also gives the cabin climate and the four tire pressures. Most rows logged while driving have neither, so each group comes from the latest row that has it, with the time of that row.
 
 | Tool | What it returns |
 |---|---|
 | `get_timeline` | What the car did, in order: drives, charges, the time parked between them, and software updates, with places, battery %, kWh, and cost; answers "what did my car do on Saturday?" |
 | `get_state_history` | Per car and local day: hours online, asleep, and offline, driving and charging hours, idle awake hours (online while parked and not charging), and wake-ups |
 | `get_idle_awake_periods` | The online periods that kept the car awake while parked, longest first, with where it was parked; answers "why isn't my car sleeping?" |
+| `get_logging_gaps` | Logging holes: drives and charges TeslaMate never closed, and stretches with no position across which the odometer moved or the battery level rose (a drive or charge that was not logged). A parked car logs nothing, so long parks stay out |
 
-### Search and detail (5)
+### Search and detail (6)
 
 | Tool | What it returns |
 |---|---|
 | `search_drives` | Drives filtered by date range, location text, distance, and car; sortable |
 | `search_charging_sessions` | Charging sessions filtered by date range, location, energy, and car |
-| `get_drive_details` | Full statistics for one drive |
+| `get_drive_details` | Full statistics for one drive, with ideal range and the start and end geofence names |
 | `get_drive_route` | GPS track points for one drive, downsampled |
 | `get_charging_curve` | Power and SOC curve for one charging session, downsampled |
+| `get_charging_session` | One charging session, AC or DC: energy added and used, battery % at start and end, cost, duration, geofence, AC phases, cable, and peak power |
 
-### Costs (3)
+### Costs (4)
 
 A session with no cost recorded counts as unknown, not free: averages per kWh use only the sessions that have a cost, and each report says how many sessions lack one.
 
@@ -162,6 +164,7 @@ A session with no cost recorded counts as unknown, not free: averages per kWh us
 | `get_charging_costs` | Costs grouped by month, location, or car, with the number of sessions that have no cost |
 | `get_charging_cost_estimates` | An estimated cost for each session with none: free Supercharging, a price you give, the geofence tariff, what you paid at the same place, or the typical price for that charger type |
 | `get_fuel_savings` | What the same distance would have cost in fuel, against what charging cost, per car |
+| `get_geofences` | Each TeslaMate geofence with its center, radius, and tariff: cost per unit, session fee, and billing type |
 
 ### Trips (3)
 

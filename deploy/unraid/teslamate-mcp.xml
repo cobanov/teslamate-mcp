@@ -11,8 +11,8 @@
   <Overview>
     Model Context Protocol (MCP) server that exposes your TeslaMate PostgreSQL database
     to AI assistants (Claude, Cursor, ...) over streamable HTTP.
-    57 tools (47 predefined analytics queries + run_sql + get_database_schema +
-    8 interactive MCP Apps charts), 11 prompts, resources.
+    67 tools (56 predefined analytics queries + run_sql + get_database_schema +
+    9 interactive MCP Apps charts), 12 prompts, resources.
 
     Requires a running TeslaMate + PostgreSQL stack.
     Endpoint: http://[IP]:[PORT:8888]/mcp - Health: http://[IP]:[PORT:8888]/health

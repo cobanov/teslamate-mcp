@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- `get_current_car_status` returns the cabin climate (inside temperature,
+  setpoints, fan, defrosters) and the four tire pressures. Most rows logged
+  while driving have neither, so each group comes from the latest row that has
+  it, up to 7 days before `last_update`. `climate_at` and `tpms_at` give the
+  time of that row.
+- **`get_charging_session`**: one charging session, AC or DC, by id: energy
+  added and used, battery % at start and end, cost, duration, geofence, AC
+  phases, cable, and peak power. It uses the same DC test as the fast-charging
+  tools.
+- **`get_geofences`**: each TeslaMate geofence with its center, radius, cost
+  per unit, session fee, and billing type.
+- **`get_logging_gaps`**: drives and charges that TeslaMate never closed, and
+  position holes of at least `min_hours`. A hole counts only when the odometer
+  moved or the battery level rose across it, because a parked car logs
+  nothing and a drop alone is idle drain.
+- `get_drive_details` returns the ideal range at start and end, and the start
+  and end geofence names.
+
 ## [0.15.0] - 2026-10-12
 
 ### Changed

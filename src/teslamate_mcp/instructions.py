@@ -29,8 +29,9 @@ def build_instructions(settings: Settings) -> str:
         "and say which car each number belongs to.",
         "",
         "Which tool:",
-        "- Where is the car, is it charging or asleep: `get_current_car_status`. What "
-        "it did on a day or week: `get_timeline`.",
+        "- Where is the car, is it charging or asleep, cabin temperature, tire "
+        "pressures: `get_current_car_status`. What it did on a day or week: "
+        "`get_timeline`. Drives or charges TeslaMate did not log: `get_logging_gaps`.",
         "- Journeys: `get_trips` (TeslaMate ends a drive at every stop, so a journey "
         "is several drives). Single drives: `search_drives`, `get_drive_details`. "
         "A commute or any route driven again and again: `get_frequent_routes`.",
@@ -44,9 +45,10 @@ def build_instructions(settings: Settings) -> str:
         "driving faster costs: `get_efficiency_by_speed`.",
         "- Battery health: `get_battery_capacity_trend` (energy-based) first, then "
         "`get_battery_degradation_over_time`.",
-        "- Charging: `search_charging_sessions`, `get_fast_charging_sessions`, "
-        "`get_fast_charging_by_location`. Money: `get_charging_costs`, "
-        "`get_charging_cost_estimates`, `get_fuel_savings`.",
+        "- Charging: `search_charging_sessions`, `get_charging_session` (one AC or DC "
+        "session), `get_fast_charging_sessions`, `get_fast_charging_by_location`. "
+        "Money: `get_charging_costs`, `get_charging_cost_estimates`, "
+        "`get_fuel_savings`. Geofence tariffs: `get_geofences`.",
         "- Overviews: `get_activity_report` (a month or year), `get_period_comparison`. "
         "A year or month in review, 'Wrapped': `show_recap` / `get_recap`.",
         "- Anything else: `get_database_schema`, then a read-only `run_sql`.",
