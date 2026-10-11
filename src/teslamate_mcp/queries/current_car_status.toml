@@ -1,5 +1,5 @@
 name = "get_current_car_status"
-description = "Returns the latest recorded snapshot per car: what the car is doing now (car_state: driving, charging, online, asleep, or offline) and since when, battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. When last_update is old, TeslaMate has lost contact with the car and car_state is stale. Optional filters: car_name."
+description = "Returns the latest recorded snapshot per car: what the car is doing now (car_state: driving, charging, online, asleep, or offline) and since when, battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Also returns the cabin climate (inside temperature and setpoints in °C, fan, defrosters) and the four tire pressures (bar). Most in-drive rows carry neither, so each group comes from the latest row that has it, up to 7 days before last_update; climate_at and tpms_at give that row's time. When last_update is old, TeslaMate has lost contact with the car and car_state is stale. Optional filters: car_name."
 
 [[params]]
 name = "car_name"
@@ -29,6 +29,64 @@ type = "number"
 [[output]]
 name = "is_climate_on"
 type = "boolean"
+
+[[output]]
+name = "inside_temp"
+type = "number"
+description = "Cabin temperature (°C) from the latest row that has climate data."
+
+[[output]]
+name = "driver_temp_setting"
+type = "number"
+description = "Driver setpoint (°C), from the same row as inside_temp."
+
+[[output]]
+name = "passenger_temp_setting"
+type = "number"
+description = "Passenger setpoint (°C), from the same row as inside_temp."
+
+[[output]]
+name = "fan_status"
+type = "integer"
+description = "Fan speed step, 0 when off. From the same row as inside_temp."
+
+[[output]]
+name = "is_front_defroster_on"
+type = "boolean"
+
+[[output]]
+name = "is_rear_defroster_on"
+type = "boolean"
+
+[[output]]
+name = "climate_at"
+type = "string"
+description = "Time of the row that gave the climate columns (UTC). Null when no row in the 7 days before last_update has climate data."
+
+[[output]]
+name = "tpms_pressure_fl"
+type = "number"
+description = "Front-left tire pressure, bar."
+
+[[output]]
+name = "tpms_pressure_fr"
+type = "number"
+description = "Front-right tire pressure, bar."
+
+[[output]]
+name = "tpms_pressure_rl"
+type = "number"
+description = "Rear-left tire pressure, bar."
+
+[[output]]
+name = "tpms_pressure_rr"
+type = "number"
+description = "Rear-right tire pressure, bar."
+
+[[output]]
+name = "tpms_at"
+type = "string"
+description = "Time of the row that gave the tire pressures (UTC). Null when no row in the 7 days before last_update has a tire value."
 
 [[output]]
 name = "latitude"
