@@ -27,6 +27,20 @@ All notable changes to this project are documented in this file. The format foll
   averaged within 15 km/h of it, which is finer than `highway`.
 - The `plan_trip` prompt passes the average speed and times the charging stop.
 
+### Fixed
+- `get_trips`, `get_trip_details` and `get_trip_route` became very slow on a
+  long history, because they looked through the car's charging sessions once
+  for every drive. They now pair drives and sessions in one pass: on a test
+  history of 60,000 drives and 12,000 sessions `get_trips` went from 47 s to
+  0.5 s. The trips themselves are unchanged.
+- `get_timeline` puts only the activities around its window in order, not the
+  car's whole history, and reads the state log once for the parks it shows
+  (334 ms to 58 ms on the same history; 673 ms to 66 ms for 500 rows).
+- With Cloudflare Access sign-in, the server asks Cloudflare for its signing
+  keys at most once every 30 seconds. A token naming an unknown key id used to
+  trigger a fetch each time, so anyone could make the server call Cloudflare
+  once per request. A newly rotated key is now accepted up to 30 seconds late.
+
 ## [0.14.0] - 2026-09-30
 
 ### Added

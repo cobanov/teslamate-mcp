@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import io
+import json
 import time
+from urllib.error import URLError
 
 import jwt
 import pytest
@@ -12,7 +15,11 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from teslamate_mcp.auth import BearerAuthMiddleware, CloudflareAccessVerifier
+from teslamate_mcp.auth import (
+    BearerAuthMiddleware,
+    CloudflareAccessVerifier,
+    _ThrottledJWKClient,
+)
 from teslamate_mcp.config import Settings
 
 _TOKEN = "sekrit-token"
@@ -99,10 +106,10 @@ class _UnreachableKeys:
         raise jwt.PyJWKClientError("Fail to fetch data from the url")
 
 
-def _assertion(*, key=_KEY, aud=_AUD, iss=_ISSUER, exp_offset=300) -> str:
+def _assertion(*, key=_KEY, aud=_AUD, iss=_ISSUER, exp_offset=300, kid=None) -> str:
     now = int(time.time())
     claims = {"aud": [aud], "iss": iss, "iat": now, "exp": now + exp_offset, "email": "me@x"}
-    return jwt.encode(claims, key, algorithm="RS256")
+    return jwt.encode(claims, key, algorithm="RS256", headers={"kid": kid} if kid else None)
 
 
 def _access_client(*, auth_token: str = "", keys=None) -> TestClient:
@@ -182,3 +189,99 @@ def test_cf_access_settings_must_come_in_pairs() -> None:
     with pytest.raises(ValueError):
         Settings(database_url="postgresql://x", cf_access_aud=_AUD)
     Settings(database_url="postgresql://x", cf_access_team_domain=_TEAM, cf_access_aud=_AUD)
+
+
+# --- Fetching Cloudflare's keys ----------------------------------------------
+
+
+class _KeyEndpoint:
+    """Stands in for /cdn-cgi/access/certs and counts how often it is asked."""
+
+    def __init__(self, **keys) -> None:
+        self.keys = keys
+        self.fetches = 0
+        self.down = False
+
+    def __call__(self, request, timeout=None, context=None):
+        self.fetches += 1
+        if self.down:
+            raise URLError("unreachable")
+        jwks = [
+            {**jwt.algorithms.RSAAlgorithm.to_jwk(key.public_key(), as_dict=True), "kid": kid}
+            for kid, key in self.keys.items()
+        ]
+        return io.BytesIO(json.dumps({"keys": jwks}).encode())
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+@pytest.fixture
+def key_endpoint(monkeypatch) -> _KeyEndpoint:
+    endpoint = _KeyEndpoint(current=_KEY)
+    monkeypatch.setattr("urllib.request.urlopen", endpoint)
+    return endpoint
+
+
+def _throttled_verifier(clock: _Clock) -> CloudflareAccessVerifier:
+    keys = _ThrottledJWKClient(
+        f"{_ISSUER}/cdn-cgi/access/certs", min_fetch_interval=30, clock=clock, cache_keys=True
+    )
+    return CloudflareAccessVerifier(team_domain=_TEAM, audience=_AUD, jwks_client=keys)
+
+
+def test_unknown_key_ids_do_not_refetch_the_key_set(key_endpoint) -> None:
+    clock = _Clock()
+    verifier = _throttled_verifier(clock)
+    assert verifier.verify(_assertion(kid="current"))
+    assert key_endpoint.fetches == 1
+
+    # Anyone can send these: each names a key id the server has never seen.
+    for n in range(20):
+        assert not verifier.verify(_assertion(key=_OTHER_KEY, kid=f"made-up-{n}"))
+    assert key_endpoint.fetches == 1
+
+    clock.now += 31
+    for n in range(20):
+        assert not verifier.verify(_assertion(key=_OTHER_KEY, kid=f"later-{n}"))
+    assert key_endpoint.fetches == 2
+    assert verifier.verify(_assertion(kid="current"))
+
+
+def test_rotated_key_is_accepted_once_the_interval_has_passed(key_endpoint) -> None:
+    clock = _Clock()
+    verifier = _throttled_verifier(clock)
+    assert verifier.verify(_assertion(kid="current"))
+
+    key_endpoint.keys["rotated"] = _OTHER_KEY
+    rotated = _assertion(key=_OTHER_KEY, kid="rotated")
+    assert not verifier.verify(rotated)
+
+    clock.now += 31
+    assert verifier.verify(rotated)
+    assert key_endpoint.fetches == 2
+
+
+def test_failed_key_fetch_is_not_repeated_at_once(key_endpoint) -> None:
+    clock = _Clock()
+    verifier = _throttled_verifier(clock)
+    key_endpoint.down = True
+    assert not verifier.verify(_assertion(kid="current"))
+    assert not verifier.verify(_assertion(kid="current"))
+    assert key_endpoint.fetches == 1
+
+    key_endpoint.down = False
+    assert not verifier.verify(_assertion(kid="current"))
+    clock.now += 31
+    assert verifier.verify(_assertion(kid="current"))
+    assert key_endpoint.fetches == 2
+
+
+def test_verifier_throttles_key_fetches_by_default() -> None:
+    verifier = CloudflareAccessVerifier(team_domain=_TEAM, audience=_AUD)
+    assert isinstance(verifier._keys, _ThrottledJWKClient)

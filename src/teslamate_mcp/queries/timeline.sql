@@ -22,7 +22,7 @@ scope_cars AS (
 -- Drives TeslaMate left open after a restart are orphans and are skipped. A
 -- charging session without an end_date is included only while it is still
 -- logging samples.
-activities AS (
+history AS (
     SELECT 'drive'::text AS activity,
         d.car_id,
         d.id,
@@ -46,8 +46,32 @@ activities AS (
                 AND ch.date >= (now() AT TIME ZONE 'UTC') - interval '1 hour'
         ))
 ),
--- Sequenced over the car's whole history, so the park after the last
--- activity in the window still ends where the next activity starts.
+-- Only the activities around the window are put in order, not the car's
+-- whole history: from the last one that started before the window, or an
+-- earlier one that is still going on when it opens, to the first one that
+-- starts after it. The first gives the park that runs into the window, and
+-- the last ends the park that runs out of it.
+reach AS (
+    SELECT h.car_id,
+        LEAST(
+            MAX(h.start_date) FILTER (WHERE h.start_date < win.win_start),
+            MIN(h.start_date) FILTER (
+                WHERE h.start_date < win.win_start
+                    AND COALESCE(h.end_date, now() AT TIME ZONE 'UTC') > win.win_start
+            )
+        ) AS first_start,
+        MIN(h.start_date) FILTER (WHERE h.start_date >= win.win_end) AS last_start
+    FROM history h
+        CROSS JOIN win
+    GROUP BY h.car_id
+),
+activities AS (
+    SELECT h.*
+    FROM history h
+        JOIN reach r ON r.car_id = h.car_id
+    WHERE h.start_date >= COALESCE(r.first_start, '-infinity')
+        AND h.start_date <= COALESCE(r.last_start, 'infinity')
+),
 sequenced AS (
     SELECT a.*,
         LEAD(a.activity) OVER w AS next_activity,
@@ -103,6 +127,24 @@ windowed AS (
         AND COALESCE(e.end_date, now() AT TIME ZONE 'UTC') > win.win_start
     ORDER BY e.start_date DESC
     LIMIT %(limit)s::int
+),
+-- The state log for the time the parks in the output span, read once. Each
+-- park below looks only at these rows, not at the car's whole log.
+park_span AS (
+    SELECT MIN(w.start_date) AS first_start,
+        MAX(COALESCE(w.end_date, now() AT TIME ZONE 'UTC')) AS last_end
+    FROM windowed w
+    WHERE w.activity = 'park'
+),
+park_states AS MATERIALIZED (
+    SELECT s.car_id,
+        s.state::text AS state,
+        s.start_date,
+        s.end_date
+    FROM states s
+        JOIN park_span ps ON s.start_date < ps.last_end
+            AND COALESCE(s.end_date, now() AT TIME ZONE 'UTC') > ps.first_start
+    WHERE s.car_id IN (SELECT id FROM scope_cars)
 ),
 -- Places and battery levels, looked up only for the drives and charges the
 -- output needs: its own rows, and the activities on either side of a park.
@@ -187,11 +229,11 @@ FROM windowed w
                     LEAST(COALESCE(s.end_date, now() AT TIME ZONE 'UTC'),
                         COALESCE(w.end_date, now() AT TIME ZONE 'UTC'))
                     - GREATEST(s.start_date, w.start_date)
-                ))) FILTER (WHERE s.state::text IN ('asleep', 'offline')), 0)
+                ))) FILTER (WHERE s.state IN ('asleep', 'offline')), 0)
             / NULLIF(EXTRACT(EPOCH FROM (
                 COALESCE(w.end_date, now() AT TIME ZONE 'UTC') - w.start_date
             )), 0))::numeric) END AS pct
-        FROM states s
+        FROM park_states s
         WHERE w.activity = 'park'
             AND s.car_id = w.car_id
             AND s.start_date < COALESCE(w.end_date, now() AT TIME ZONE 'UTC')

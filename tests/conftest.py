@@ -499,6 +499,34 @@ FROM base CROSS JOIN generate_series(0, 119) AS n;
 DROP TABLE base;
 """
 
+_STOPS_SQL = """
+-- Car 14 for the edges of a stop (fixed UTC dates). Every stop on the first
+-- day is 60 minutes, between the 30-min plain limit and the 120-min charging
+-- limit, so a stop joins two drives only when the car charged in it:
+--   701 -> 702: a session starts the minute drive 701 ends, so it counts.
+--   702 -> 703: a session starts the minute drive 703 starts, so it does not.
+--   703 -> 704: the latest session is that one, from before drive 703 ended.
+-- Drive 705 follows nine days later, with nothing logged in between.
+INSERT INTO car_settings (id) VALUES (14);
+INSERT INTO cars VALUES (14, 'Stopper', 'model3', 'LR', 'Black', 'Model 3 LR', 14, 0.15);
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, speed_max,
+    start_address_id, end_address_id, start_rated_range_km, end_rated_range_km) VALUES
+    (701, 14, TIMESTAMP '2025-03-01 08:00', TIMESTAMP '2025-03-01 08:30', 30.0, 30, 100,
+     1, 2, 400.0, 370.0),
+    (702, 14, TIMESTAMP '2025-03-01 09:30', TIMESTAMP '2025-03-01 10:00', 30.0, 30, 100,
+     2, 1, 420.0, 390.0),
+    (703, 14, TIMESTAMP '2025-03-01 11:00', TIMESTAMP '2025-03-01 11:30', 30.0, 30, 100,
+     1, 2, 390.0, 360.0),
+    (704, 14, TIMESTAMP '2025-03-01 12:30', TIMESTAMP '2025-03-01 13:00', 30.0, 30, 100,
+     2, 1, 360.0, 330.0),
+    (705, 14, TIMESTAMP '2025-03-10 08:00', TIMESTAMP '2025-03-10 08:30', 30.0, 30, 100,
+     1, 2, 330.0, 300.0);
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    duration_min, address_id, start_battery_level, end_battery_level) VALUES
+    (701, 14, TIMESTAMP '2025-03-01 08:30', TIMESTAMP '2025-03-01 09:20', 20.0, 50, 2, 40, 70),
+    (702, 14, TIMESTAMP '2025-03-01 11:00', TIMESTAMP '2025-03-01 11:00', 0.0, 0, 1, 70, 70);
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -507,6 +535,7 @@ _EXTRA_SEEDS = {
     "fast": _FAST_SQL,
     "climate": _CLIMATE_SQL,
     "routes": _ROUTES_SQL,
+    "stops": _STOPS_SQL,
 }
 
 
