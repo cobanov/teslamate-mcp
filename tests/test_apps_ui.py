@@ -9,7 +9,11 @@ from teslamate_mcp.server import create_server
 from teslamate_mcp.tools.apps_ui import (
     APP_SPECS,
     CHARGING_CURVE_APP_URI,
+    MAP_CSP,
+    MAP_STYLE_HOST,
     MAP_TILE_HOST,
+    MAP_VECTOR_HOSTS,
+    _load_app_file,
     _load_app_html,
     _render_app_html,
     build_apps_extension,
@@ -36,6 +40,19 @@ _APP_ARGS = {
 }
 # Views that draw a basemap.
 _MAP_VIEWS = {"show_drive_route", "show_trip_route", "show_visited_places"}
+# What a map view declares to the host: the vector basemap MapLibre fetches,
+# and the raster tiles of the SVG fallback.
+_MAP_CSP_META = {
+    "connectDomains": list(MAP_VECTOR_HOSTS),
+    "resourceDomains": [MAP_TILE_HOST, *MAP_VECTOR_HOSTS],
+}
+
+
+def _own_markup(html: str) -> str:
+    """A served view without the vendored MapLibre files, whose text has links of its own."""
+    for asset in ("maplibre-gl.js", "maplibre-gl.css"):
+        html = html.replace(_load_app_file("vendor", asset), "")
+    return html
 
 
 def test_every_app_spec_has_seeded_args() -> None:
@@ -112,9 +129,13 @@ async def _drive_route_resource(*, map_tiles: bool):
 @pytest.mark.asyncio
 async def test_map_tiles_on_declares_basemap_host() -> None:
     resource, html, tool = await _drive_route_resource(map_tiles=True)
-    assert resource.meta["ui"]["csp"] == {"resourceDomains": [MAP_TILE_HOST]}
+    assert MAP_CSP.model_dump(by_alias=True, exclude_none=True) == _MAP_CSP_META
+    assert resource.meta["ui"]["csp"] == _MAP_CSP_META
     assert f'"{MAP_TILE_HOST}"' in html
-    assert "__MAP_TILE_HOST__" not in html
+    assert f'"{MAP_STYLE_HOST}"' in html
+    assert "maplibregl.Map(" in html  # the shared map layer and the library are inlined
+    assert _load_app_file("vendor", "maplibre-gl.js") in html
+    assert "__MAP" not in html
     assert tool.meta["ui"]["resourceUri"] == str(resource.uri)
 
 
@@ -124,7 +145,9 @@ async def test_map_tiles_off_keeps_view_self_contained() -> None:
     on_resource, _, _ = await _drive_route_resource(map_tiles=True)
     assert "csp" not in resource.meta["ui"]
     assert "https://" not in html
-    assert "__MAP_TILE_HOST__" not in html
+    assert "maplibregl" not in html  # no library either: the SVG map draws alone
+    assert len(html) < 100_000
+    assert "__MAP" not in html
     # A settings change must not reuse a host's cached copy of the other variant.
     assert str(resource.uri) != str(on_resource.uri)
     assert tool.meta["ui"]["resourceUri"] == str(resource.uri)
@@ -134,6 +157,18 @@ def test_only_the_map_views_use_tiles() -> None:
     for spec in APP_SPECS:
         on = _render_app_html(spec.html_file, True)
         assert ("https://" in on) is (spec.tool_name in _MAP_VIEWS), spec.tool_name
+        assert ("maplibregl" in on) is (spec.tool_name in _MAP_VIEWS), spec.tool_name
+
+
+def test_inlined_map_files_cannot_close_their_tag() -> None:
+    """The MapLibre files go inside <script> and <style>; text that ends the tag
+    (or opens an HTML comment in a script) would cut the view short. Guards a
+    library update."""
+    for path in (("vendor", "maplibre-gl.js"), ("map_gl.js",)):
+        script = _load_app_file(*path).lower()
+        assert "</script" not in script and "<!--" not in script, path
+    for path in (("vendor", "maplibre-gl.css"), ("map_gl.css",)):
+        assert "</style" not in _load_app_file(*path).lower(), path
 
 
 def test_missing_curve_query_fails_fast() -> None:
@@ -154,8 +189,8 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
             content = read.contents[0]
             assert content.mime_type == "text/html;profile=mcp-app"
             expected_ui: dict = {"prefersBorder": True}
-            if spec.tool_name in _MAP_VIEWS:  # basemap tiles (MAP_TILES default on)
-                expected_ui["csp"] = {"resourceDomains": [MAP_TILE_HOST]}
+            if spec.tool_name in _MAP_VIEWS:  # basemap (MAP_TILES default on)
+                expected_ui["csp"] = _MAP_CSP_META
             assert content.meta == {"ui": expected_ui}
             # The document must speak the ext-apps handshake and render offline.
             for marker in (
@@ -166,8 +201,9 @@ async def test_app_resources_served_with_mcp_app_mime(mcp_session) -> None:
                 "ui/resource-teardown",
             ):
                 assert marker in content.text, (spec.tool_name, marker)
-            # No external fetches beyond the declared basemap host.
-            external = content.text.replace(MAP_TILE_HOST, "")
+            # No external fetches beyond the declared basemap hosts.
+            external = _own_markup(content.text).replace(MAP_TILE_HOST, "")
+            external = external.replace(MAP_STYLE_HOST, "")
             assert "https://" not in external, spec.tool_name
 
 

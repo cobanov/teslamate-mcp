@@ -19,29 +19,64 @@ from mcp.types import ToolAnnotations
 
 from .registry import PredefinedTool, make_query_handler
 
-# Basemap for the drive-route view: Esri's light/dark gray canvas base layers
-# (no labels, keyless), with the attribution the view draws. CARTO's keyless
-# basemaps now answer every request with a "key required" placeholder tile.
-# Fetching tiles tells Esri the rough area being viewed; MAP_TILES=false keeps
-# the view fully self-contained.
+# Basemap for the map views (drive, trip, places). They draw with MapLibre GL,
+# inlined from apps/vendor/ so nothing loads from a CDN, over CARTO's keyless
+# vector styles (Positron / Dark Matter): the style from MAP_STYLE_HOST, then
+# tiles, fonts, and sprites from the tile hosts. Where MapLibre cannot run (no
+# WebGL, or a host that forbids blob: workers) the views draw their SVG map
+# over Esri's gray canvas raster tiles instead; CARTO's keyless raster tiles
+# answer every request with a "key required" placeholder. Fetching either
+# tells that provider the rough area being viewed; MAP_TILES=false keeps the
+# views fully self-contained.
+MAP_STYLE_HOST = "https://basemaps.cartocdn.com"
+# Listed one by one: not every host accepts a wildcard in a CSP domain.
+MAP_VECTOR_HOSTS = (
+    MAP_STYLE_HOST,
+    "https://tiles.basemaps.cartocdn.com",
+    *(f"https://tiles-{shard}.basemaps.cartocdn.com" for shard in "abcd"),
+)
 MAP_TILE_HOST = "https://server.arcgisonline.com"
 _MAP_TILE_PLACEHOLDER = "__MAP_TILE_HOST__"
+_MAP_STYLE_PLACEHOLDER = "__MAP_STYLE_HOST__"
 
 
 @cache
+def _load_app_file(*path: str) -> str:
+    return files("teslamate_mcp").joinpath("apps", *path).read_text(encoding="utf-8")
+
+
 def _load_app_html(filename: str) -> str:
-    return files("teslamate_mcp").joinpath("apps", filename).read_text(encoding="utf-8")
+    return _load_app_file(filename)
 
 
 def _uses_map_tiles(filename: str) -> bool:
     return _MAP_TILE_PLACEHOLDER in _load_app_html(filename)
 
 
+def _map_gl_inlines(map_tiles: bool) -> dict[str, str]:
+    """What fills a map view's MapLibre slots: the library, or nothing when tiles are off."""
+    if not map_tiles:
+        return {"/*__MAP_GL_CSS__*/": "", "/*__MAPLIBRE_JS__*/": "", "/*__MAP_GL_JS__*/": ""}
+    return {
+        "/*__MAP_GL_CSS__*/": (
+            _load_app_file("vendor", "maplibre-gl.css") + "\n" + _load_app_file("map_gl.css")
+        ),
+        "/*__MAPLIBRE_JS__*/": _load_app_file("vendor", "maplibre-gl.js"),
+        "/*__MAP_GL_JS__*/": _load_app_file("map_gl.js").replace(
+            _MAP_STYLE_PLACEHOLDER, MAP_STYLE_HOST
+        ),
+    }
+
+
 @cache
 def _render_app_html(filename: str, map_tiles: bool) -> str:
-    """The view as served: the basemap host filled in, or "" when tiles are off."""
-    host = MAP_TILE_HOST if map_tiles else ""
-    return _load_app_html(filename).replace(_MAP_TILE_PLACEHOLDER, host)
+    """The view as served: basemap hosts and MapLibre filled in, or neither when tiles are off."""
+    html = _load_app_html(filename).replace(
+        _MAP_TILE_PLACEHOLDER, MAP_TILE_HOST if map_tiles else ""
+    )
+    for slot, content in _map_gl_inlines(map_tiles).items():
+        html = html.replace(slot, content)
+    return html
 
 
 @cache
@@ -257,6 +292,11 @@ APP_SPECS: tuple[AppSpec, ...] = (
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri
 
+MAP_CSP = ResourceCsp(
+    connect_domains=list(MAP_VECTOR_HOSTS),
+    resource_domains=[MAP_TILE_HOST, *MAP_VECTOR_HOSTS],
+)
+
 # The ext-apps reference SDK (registerAppTool) stamps both `_meta.ui.resourceUri`
 # and this deprecated flat key, because hosts that predate the nested form only
 # read the flat one. The Python SDK's Apps.tool() writes only the nested form,
@@ -317,8 +357,9 @@ def build_apps_extension(
             name=spec.resource_name,
             title=spec.resource_title,
             description=spec.resource_description,
-            # Hosts deny all external loads unless declared; only images.
-            csp=ResourceCsp(resource_domains=[MAP_TILE_HOST]) if tiles else None,
+            # Hosts deny all external loads unless declared: MapLibre fetches the
+            # vector basemap; the SVG map loads raster tiles as images.
+            csp=MAP_CSP if tiles else None,
             prefers_border=True,
         )
     return apps

@@ -78,9 +78,10 @@ class Settings(BaseSettings):
     map_tiles: bool = Field(
         default=True,
         description=(
-            "Draw a basemap (Esri gray canvas tiles) under the route, trip, and places maps. "
-            "Fetching tiles reveals the rough area being viewed to Esri; set "
-            "false to keep the chart fully self-contained."
+            "Draw an interactive basemap (CARTO vector tiles; Esri raster tiles where "
+            "the client cannot run it) under the route, trip, and places maps. Fetching "
+            "tiles reveals the rough area being viewed to that provider; set false to "
+            "keep the maps fully self-contained."
         ),
     )
 

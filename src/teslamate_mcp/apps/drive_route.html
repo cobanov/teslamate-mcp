@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Drive route</title>
+<style>/*__MAP_GL_CSS__*/</style>
 <style>
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; margin: 0; }
@@ -15,9 +16,9 @@
     --text-muted: #898781;
     --grid: #e1e0d9;
     --baseline: #c3c2b7;
-    --route: #2a78d6;
-    --marker-start: #1d8a63;
-    --marker-end: #c9375f;
+    --route: #3e6ae1;
+    --map-bg: #fafaf8;
+    --icon-invert: 0;
     --border: rgba(11,11,11,0.10);
   }
   @media (prefers-color-scheme: dark) {
@@ -29,9 +30,9 @@
       --text-muted: #898781;
       --grid: #2c2c2a;
       --baseline: #383835;
-      --route: #3987e5;
-      --marker-start: #27a578;
-      --marker-end: #d9527a;
+      --route: #3e6ae1;
+      --map-bg: #0e0e0e;
+      --icon-invert: 1;
       --border: rgba(255,255,255,0.10);
     }
   }
@@ -43,9 +44,9 @@
     --text-muted: #898781;
     --grid: #2c2c2a;
     --baseline: #383835;
-    --route: #3987e5;
-    --marker-start: #27a578;
-    --marker-end: #d9527a;
+    --route: #3e6ae1;
+    --map-bg: #0e0e0e;
+    --icon-invert: 1;
     --border: rgba(255,255,255,0.10);
   }
   .viz-root {
@@ -62,6 +63,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
   .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
   .legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .legend .dot.start { background: var(--surface-1); border: 2px solid var(--text-primary); }
   .chart-wrap { position: relative; margin-top: 6px; }
   svg { display: block; width: 100%; }
   svg:focus { outline: 1.5px solid var(--route); outline-offset: 2px; border-radius: 2px; }
@@ -73,6 +75,8 @@
   .map-label { paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; stroke-linejoin: round; }
   .scale-line { stroke: var(--baseline); stroke-width: 2; }
   .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .start-dot { fill: var(--surface-1); stroke: var(--text-primary); stroke-width: 2; }
+  .end-dot { fill: var(--route); stroke: #fff; stroke-width: 2; }
   .panel-title { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
   .grid-line { stroke: var(--grid); stroke-width: 1; }
   .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -106,10 +110,11 @@
   </header>
   <div class="stats" id="stats" hidden></div>
   <div class="legend" id="legend" hidden>
-    <div class="item"><span class="dot" style="background:var(--marker-start)"></span>Start</div>
-    <div class="item"><span class="dot" style="background:var(--marker-end)"></span>End</div>
+    <div class="item"><span class="dot start"></span>Start</div>
+    <div class="item"><span class="dot" style="background:var(--route)"></span>End</div>
   </div>
   <div class="chart-wrap" id="chartWrap" hidden>
+    <div class="tm-map" id="map" hidden></div>
     <svg id="chart" role="img" tabindex="0" aria-label="Drive route map. Use arrow keys to step along the track."></svg>
     <svg id="profile" role="img" aria-label="Elevation profile along the route. Hover to find the place on the map." style="display:none"></svg>
     <div class="tooltip" id="tooltip"></div>
@@ -120,6 +125,8 @@
     <div id="tableBox" style="overflow-x:auto"></div>
   </details>
 </div>
+<script>/*__MAPLIBRE_JS__*/</script>
+<script>/*__MAP_GL_JS__*/</script>
 <script>
 "use strict";
 /* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
@@ -184,7 +191,7 @@ window.addEventListener("message", (event) => {
 // handshake leaves the view empty.
 request("ui/initialize", {
   protocolVersion: "2026-01-26",
-  appInfo: { name: "teslamate-drive-route", version: "1.2.0" },
+  appInfo: { name: "teslamate-drive-route", version: "1.3.0" },
   appCapabilities: {},
 }).then((res) => {
   const hc = (res && res.hostContext) || {};
@@ -234,6 +241,7 @@ function onToolResult(result) {
     return;
   }
   rows = extractRows(result);
+  if (gl) { gl.remove(); gl = null; hoverMarker = null; } // new rows get a new map
   if (!rows.length) {
     showState("No GPS positions recorded for this drive.");
     return;
@@ -362,6 +370,14 @@ const TILE_HOST_SETTING = "__MAP_TILE_HOST__";
 // Left unreplaced (starts with "__") means the view was loaded outside the server.
 const TILE_HOST = TILE_HOST_SETTING.startsWith("__") ? "" : TILE_HOST_SETTING;
 let geom = null;
+// The interactive map (MapLibre over CARTO's vector basemap) is inlined by the
+// server when MAP_TILES is on. Nothing is drawn until its start-up check
+// settles; where it cannot run, the SVG map below is drawn instead.
+let glMode = typeof TeslaMateMap === "undefined" ? "off" : "pending";
+let gl = null, hoverMarker = null;
+if (glMode === "pending") {
+  TeslaMateMap.available().then((ok) => { glMode = ok ? "on" : "off"; render(); });
+}
 
 function el(name, attrs) {
   const node = document.createElementNS(NS, name);
@@ -383,9 +399,61 @@ function isDark() {
 }
 
 function render() {
-  if (!points.length) { reportSize(); return; }
+  if (!points.length || glMode === "pending") { reportSize(); return; }
+  const width = Math.max(280, document.getElementById("chartWrap").clientWidth || 280);
+  if (glMode === "on" && !renderGlMap()) glMode = "off";
+  if (glMode === "off") renderSvgMap(width);
+  renderProfile(width);
+  if (hoverIndex >= 0) showHover(hoverIndex);
+  reportSize();
+}
+
+// The track on the MapLibre map; false when the map cannot start here.
+function renderGlMap() {
+  if (gl) { gl.setDark(isDark()); return true; }
+  const box = document.getElementById("map");
+  box.hidden = false;
+  const track = points.map((p) => [p.lon, p.lat]);
+  gl = TeslaMateMap.create(box, {
+    dark: isDark(), bounds: TeslaMateMap.bounds(track), padding: 56, maxZoom: 16,
+    fitLabel: "Fit the route",
+    onFail: () => { gl = null; hoverMarker = null; glMode = "off"; render(); },
+  });
+  if (!gl) return false;
+  document.getElementById("chart").style.display = "none";
+  gl.line(track, 4);
+  gl.marker(track[0], "start");
+  gl.marker(track[track.length - 1], "end");
+  hoverMarker = gl.marker(track[0], "hover");
+  hoverMarker.getElement().style.display = "none";
+  const onPointer = (ev) => {
+    if (gl.map.isMoving()) return;
+    const i = nearestPoint(ev.point);
+    if (i < 0) hideHover(); else showHover(i);
+  };
+  gl.map.on("mousemove", onPointer);
+  gl.map.on("click", onPointer);
+  gl.map.on("mouseout", hideHover);
+  gl.map.on("movestart", hideHover);
+  return true;
+}
+
+// The track nearest the pointer on the MapLibre map, or -1 when none is in reach.
+function nearestPoint(pt) {
+  let best = -1, bestDist = 40 * 40;
+  points.forEach((p, i) => {
+    const q = gl.map.project([p.lon, p.lat]);
+    const d = (q.x - pt.x) * (q.x - pt.x) + (q.y - pt.y) * (q.y - pt.y);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+// The SVG map: the track alone, or over raster tiles when the server set a host.
+function renderSvgMap(width) {
+  document.getElementById("map").hidden = true;
   const svg = document.getElementById("chart");
-  const width = Math.max(280, svg.parentElement.clientWidth || 280);
+  svg.style.display = "";
 
   const xs = points.map((p) => mercX(p.lon)), ys = points.map((p) => mercY(p.lat));
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
@@ -430,10 +498,10 @@ function render() {
 
   const start = points[0], end = points[points.length - 1];
   svg.append(el("circle", {
-    cx: x(start.lon), cy: y(start.lat), r: 5, fill: "var(--marker-start)", class: "hover-dot",
+    cx: x(start.lon), cy: y(start.lat), r: 5, class: "start-dot",
   }));
   svg.append(el("circle", {
-    cx: x(end.lon), cy: y(end.lat), r: 5, fill: "var(--marker-end)", class: "hover-dot",
+    cx: x(end.lon), cy: y(end.lat), r: 5.5, class: "end-dot",
   }));
 
   // Scale bar: pick a round distance that spans at most ~30% of the width.
@@ -460,14 +528,10 @@ function render() {
     svg.append(attr);
   }
 
-  renderProfile(width);
-
   const hover = el("g", { id: "hoverLayer", style: "display:none" });
   hover.append(el("circle", { id: "hoverDot", r: 4.5, fill: "var(--route)", class: "hover-dot" }));
   svg.append(hover);
   bindPointer(svg);
-  if (hoverIndex >= 0) showHover(hoverIndex);
-  reportSize();
 }
 
 // Basemap tiles covering the viewport. The tile zoom is the largest one not
@@ -640,14 +704,31 @@ function bindPointer(svg) {
   };
 }
 
+// Put the hover dot on a track point; returns its place in the chart box, in CSS px.
+function markPoint(p) {
+  if (gl) {
+    hoverMarker.setLngLat([p.lon, p.lat]);
+    hoverMarker.getElement().style.display = "";
+    const box = document.getElementById("map");
+    const q = gl.map.project([p.lon, p.lat]);
+    // The elevation profile can point at a place that was panned out of view.
+    return {
+      left: Math.max(0, Math.min(box.clientWidth, q.x)),
+      top: Math.max(0, Math.min(box.clientHeight, q.y)),
+    };
+  }
+  const cx = geom.x(p.lon), cy = geom.y(p.lat);
+  document.getElementById("hoverLayer").style.display = "";
+  const dot = document.getElementById("hoverDot");
+  dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+  const scalePx = document.getElementById("chart").getBoundingClientRect().width / geom.width;
+  return { left: cx * scalePx, top: cy * scalePx };
+}
+
 function showHover(i) {
   hoverIndex = i;
   const p = points[i];
-  const cx = geom.x(p.lon), cy = geom.y(p.lat);
-  const layer = document.getElementById("hoverLayer");
-  layer.style.display = "";
-  const dot = document.getElementById("hoverDot");
-  dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+  const pos = markPoint(p);
   showProfileMarker(i);
   const tip = document.getElementById("tooltip");
   tip.replaceChildren();
@@ -669,16 +750,16 @@ function showHover(i) {
   }
   tip.style.display = "block";
   const wrap = document.getElementById("chartWrap");
-  const svgEl = document.getElementById("chart");
-  const scalePx = svgEl.getBoundingClientRect().width / geom.width;
-  const pxLeft = cx * scalePx, pxTop = cy * scalePx;
+  const pxLeft = pos.left, pxTop = pos.top;
   const flip = pxLeft > wrap.clientWidth - tip.offsetWidth - 20;
   tip.style.left = (flip ? pxLeft - tip.offsetWidth - 10 : pxLeft + 10) + "px";
   tip.style.top = Math.max(4, pxTop - tip.offsetHeight - 10) + "px";
 }
 function hideHover() {
   hoverIndex = -1;
-  document.getElementById("hoverLayer").style.display = "none";
+  if (hoverMarker) hoverMarker.getElement().style.display = "none";
+  const layer = document.getElementById("hoverLayer");
+  if (layer) layer.style.display = "none";
   hideProfileMarker();
   document.getElementById("tooltip").style.display = "none";
 }
@@ -696,6 +777,9 @@ function reportSize() {
 }
 new ResizeObserver(() => { if (points.length) render(); else reportSize(); })
   .observe(document.getElementById("root"));
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render());
+}
 document.getElementById("tableWrap").addEventListener("toggle", reportSize);
 </script>
 </body>

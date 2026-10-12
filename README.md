@@ -185,7 +185,7 @@ A session is DC when a sample came from a fast charger, or had no AC phases whil
 
 ### Charts (9)
 
-`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, `show_efficiency_vs_temperature`, and `show_recap` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Both maps draw an elevation profile under the track; hovering it finds the place on the map. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. `show_recap` is a year- or month-in-review card with the headline distance and highlights. Set `MAP_TILES=false` to keep the maps fully offline.
+`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, `show_efficiency_vs_temperature`, and `show_recap` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route, trip, and places maps are interactive (pan, zoom, fit) and draw over CARTO's light or dark basemap, matching the client; the trip map also marks every stop, with charging stops highlighted. The route and trip maps draw an elevation profile under the track; hovering it finds the place on the map. Where the client cannot run the interactive map (no WebGL, or workers blocked), a static map over Esri's gray canvas is drawn instead. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. `show_recap` is a year- or month-in-review card with the headline distance and highlights. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 
@@ -226,7 +226,7 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Most rows `run_sql` returns, whatever its `LIMIT`           |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
-| `MAP_TILES`             | `true`      | Basemap under the route, trip, and places maps (Esri tiles) |
+| `MAP_TILES`             | `true`      | Interactive basemap under the route, trip, and places maps (CARTO tiles; Esri as fallback) |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
 | `LOG_LEVEL`             | `INFO`      | Python log level                                            |
 | `DEBUG`                 | `false`     | Starlette debug mode; keep off in production                |
@@ -275,7 +275,7 @@ The startup validation rejects a query when a declared parameter is missing from
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
-- The maps' basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area being viewed. `MAP_TILES=false` turns this off.
+- The maps' basemap is fetched by the viewer's browser from CARTO (from Esri where the client cannot run the interactive map), which reveals the viewer's IP address and the rough area being viewed. The map library itself (MapLibre GL) is served by this server, not a CDN. `MAP_TILES=false` turns this off.
 - The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
 - Report vulnerabilities through [private security advisories](https://github.com/cobanov/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 

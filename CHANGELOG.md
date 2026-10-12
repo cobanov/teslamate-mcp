@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+- **Interactive maps.** `show_drive_route`, `show_trip_route`, and
+  `show_visited_places` now draw with MapLibre GL over CARTO's vector basemap
+  (Positron or Dark Matter, matching the client), with pan and zoom, zoom and
+  fit buttons, a scale, and labelled places. The route is one blue line with
+  a ring at the start and a dot at the end; charging stops and places charged
+  at are green. Hover readouts and the elevation profile work as before.
+  MapLibre is bundled (`apps/vendor/`), so nothing loads from a CDN; a map
+  view is now about 1.2 MB.
+- Where the client cannot run MapLibre (no WebGL, or a host that forbids
+  `blob:` workers) or the basemap does not load, the views fall back to the
+  previous static map over Esri's gray canvas.
+- `MAP_TILES` now covers both basemaps: the views declare CARTO's hosts (and
+  Esri's, for the fallback) to the client. With `MAP_TILES=false` the map
+  library is not sent and the views stay self-contained.
+
 ### Added
 - **`get_efficiency_by_speed`**: consumption per speed band, from the samples
   TeslaMate logs while driving (power x time over speed x time), with the
