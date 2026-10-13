@@ -1,0 +1,61 @@
+name = "get_drive_efficiency_points"
+description = "One row per drive for plotting consumption: outside temperature °C, distance km, average speed km/h, and consumption in Wh/km (rated range used x the car's efficiency), newest first. Drives shorter than min_distance_km and implausible readings are left out. Prefer show_efficiency_vs_temperature to see how cold and speed affect consumption; get_average_efficiency_by_temperature has the grouped numbers."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only drives at least this long; short drives have noisy consumption."
+default = 5.0
+minimum = 0.5
+maximum = 1000
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of drives returned (the newest)."
+default = 500
+minimum = 1
+maximum = 2000
+
+[[output]]
+name = "drive_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "UTC."
+
+[[output]]
+name = "outside_temp"
+type = "number"
+description = "Average outside temperature during the drive, °C."
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "avg_speed_kmh"
+type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"

@@ -1,5 +1,5 @@
 name = "get_charging_costs"
-description = "Charging cost analysis grouped by local month, charging location, or car: session count, total energy kWh, total cost (in the currency configured in TeslaMate), and average cost per kWh. Optional filters: car_name and a local-calendar date range."
+description = "Charging cost analysis grouped by local month, charging location, or car: session count, sessions with no recorded cost, total energy kWh, total cost (in the currency configured in TeslaMate), and average cost per kWh over the sessions that have a cost. Optional filters: car_name and a local-calendar date range. To fill in missing costs, see get_charging_cost_estimates."
 
 [[params]]
 name = "group_by"
@@ -36,9 +36,16 @@ name = "total_energy_kwh"
 type = "number"
 
 [[output]]
+name = "sessions_without_cost"
+type = "integer"
+description = "Sessions with no cost recorded; their energy is left out of avg_cost_per_kwh."
+
+[[output]]
 name = "total_cost"
 type = "number"
+description = "Sum of recorded costs; sessions with no cost contribute nothing."
 
 [[output]]
 name = "avg_cost_per_kwh"
 type = "number"
+description = "Total cost / kWh of the sessions that have a cost."

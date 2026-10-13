@@ -11,8 +11,8 @@
   <Overview>
     Model Context Protocol (MCP) server that exposes your TeslaMate PostgreSQL database
     to AI assistants (Claude, Cursor, ...) over streamable HTTP.
-    35 tools (30 predefined analytics queries + run_sql + get_database_schema +
-    3 interactive MCP Apps charts), 6 prompts, resources.
+    57 tools (47 predefined analytics queries + run_sql + get_database_schema +
+    8 interactive MCP Apps charts), 11 prompts, resources.
 
     Requires a running TeslaMate + PostgreSQL stack.
     Endpoint: http://[IP]:[PORT:8888]/mcp - Health: http://[IP]:[PORT:8888]/health
@@ -32,12 +32,21 @@
           Description="Streamable HTTP MCP endpoint (/mcp) and liveness probe (/health)."
           Type="Port" Display="always" Required="true" Mask="false">8888</Config>
   <Config Name="DATABASE_URL" Target="DATABASE_URL"
-          Default="postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
-          Description="PostgreSQL connection string for the TeslaMate database. Use the Unraid host IP and the credentials from your TeslaMate PostgreSQL container. A SELECT-only role is recommended."
-          Type="Variable" Display="always" Required="true" Mask="true">postgresql://teslamate:CHANGE_ME@192.168.1.100:5432/teslamate</Config>
+          Default="postgresql://teslamate_ro:CHANGE_ME@192.168.1.100:5432/teslamate" Mode=""
+          Description="PostgreSQL connection string for the TeslaMate database. Use the Unraid host IP and the credentials from your TeslaMate PostgreSQL container. Use a SELECT-only role (e.g. teslamate_ro), not the teslamate superuser - see SECURITY.md."
+          Type="Variable" Display="always" Required="true" Mask="true">postgresql://teslamate_ro:CHANGE_ME@192.168.1.100:5432/teslamate</Config>
   <Config Name="AUTH_TOKEN" Target="AUTH_TOKEN" Default="" Mode=""
           Description="Bearer token protecting /mcp. Generate with: openssl rand -base64 32 (or `teslamate-mcp gen-token`). Leave empty ONLY for LAN-only unauthenticated use - never when exposed via tunnel."
           Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="CF_ACCESS_TEAM_DOMAIN" Target="CF_ACCESS_TEAM_DOMAIN" Default="" Mode=""
+          Description="Optional. Cloudflare Access team domain (e.g. myteam.cloudflareaccess.com). With CF_ACCESS_AUD, accepts requests authenticated by Cloudflare Access - needed to connect claude.ai directly (without the MCP portal) so MCP Apps charts render."
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="CF_ACCESS_AUD" Target="CF_ACCESS_AUD" Default="" Mode=""
+          Description="Optional. Application Audience (AUD) tag of the Cloudflare Access application protecting the direct hostname. Set together with CF_ACCESS_TEAM_DOMAIN."
+          Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="MAP_TILES" Target="MAP_TILES" Default="true" Mode=""
+          Description="Draw a low-detail basemap (Esri gray canvas tiles) under the route, trip, and places maps. Tiles are fetched by the viewer's browser and reveal the rough area viewed; set false to keep the maps fully offline."
+          Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="INFO" Mode=""
           Description="Python log level (DEBUG, INFO, WARNING, ERROR)."
           Type="Variable" Display="advanced" Required="false" Mask="false">INFO</Config>
@@ -45,6 +54,6 @@
           Description="statement_timeout (ms) applied to run_sql custom queries."
           Type="Variable" Display="advanced" Required="false" Mask="false">5000</Config>
   <Config Name="CUSTOM_SQL_ROW_LIMIT" Target="CUSTOM_SQL_ROW_LIMIT" Default="1000" Mode=""
-          Description="Row cap injected into run_sql queries that lack an explicit LIMIT."
+          Description="Most rows run_sql returns, whatever LIMIT the query has."
           Type="Variable" Display="advanced" Required="false" Mask="false">1000</Config>
 </Container>

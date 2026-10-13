@@ -4,8 +4,7 @@
 
 If you believe you have found a security vulnerability in `teslamate-mcp`, please **do not** open a public GitHub issue. Instead, report it privately so it can be addressed before disclosure.
 
-- Open a [private security advisory](https://github.com/cobanov/teslamate-mcp/security/advisories/new) on GitHub, **or**
-- Email the maintainer at <mertcobanov@gmail.com>.
+- Open a [private security advisory](https://github.com/cobanov/teslamate-mcp/security/advisories/new) on GitHub.
 
 When reporting, please include:
 
@@ -26,7 +25,7 @@ Only the most recent minor release receives security fixes. Older versions shoul
 
 1. A cheap regex pre-check rejects multi-statement input and non-`SELECT`/`WITH` leading keywords.
 2. Queries run inside a PostgreSQL `READ ONLY` transaction with `statement_timeout`, `lock_timeout`, and `idle_in_transaction_session_timeout` enforced via `SET LOCAL`. The transaction is unconditionally rolled back.
-3. Result sets are capped: if the user query has no `LIMIT`, the planner sees a wrapped `SELECT * FROM (<q>) LIMIT N`.
+3. Result sets are capped: the query runs through a server-side cursor and at most `CUSTOM_SQL_ROW_LIMIT` rows are fetched, whatever `LIMIT` the query itself carries. A cursor can only be declared for a query, so any other statement is refused by PostgreSQL too.
 4. The HTTP transport supports bearer-token authentication with timing-safe comparison.
 
 ### Use a non-superuser role — this matters more than it sounds
@@ -53,6 +52,5 @@ None of these are writes, so none are blocked. The realistic path here is not a 
 
 ### Known limitations
 
-- **The row cap can be bypassed.** `run_sql` only wraps a query in `LIMIT` when it finds no `LIMIT` of its own, and that check does not distinguish a nested one — `SELECT * FROM (SELECT … LIMIT 5000000) x` runs uncapped. `statement_timeout` still bounds it in time, but a large result can still consume memory.
 - **`/health` is unauthenticated by design** so container health checks can reach it, and it reports a short `detail` string when the database is unreachable. Treat that as information disclosure if you expose the endpoint publicly.
 - **Write confirmation is not a security control.** When `ENABLE_CHARGING_WRITES` is on, clients without form elicitation proceed without a confirmation prompt. The column-scoped grant is the boundary.

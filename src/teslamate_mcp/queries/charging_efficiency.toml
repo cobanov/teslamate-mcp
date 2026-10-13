@@ -1,5 +1,5 @@
 name = "get_charging_efficiency"
-description = "Charging efficiency per car split by AC vs DC: energy that reached the battery (kWh added) vs energy drawn from the charger (kWh used), with the resulting efficiency percentage. DC fast-charge sessions are detected via charge samples with no charger phases. Only sessions with recorded energy-used data count."
+description = "Charging efficiency per car split by AC vs DC: energy that reached the battery (kWh added) vs energy drawn from the charger (kWh used), with the resulting efficiency percentage. A session is DC when a charge sample came from a fast charger, or had no AC phases while power flowed (AC sessions often end on a 0 kW sample with no phases, which does not count). Only sessions with recorded energy-used data count."
 
 [[params]]
 name = "car_name"

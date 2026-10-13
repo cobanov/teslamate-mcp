@@ -1,0 +1,59 @@
+name = "get_efficiency_by_elevation"
+description = "How climbing and descending change consumption: drives grouped by net climb per km (downhill, slight downhill, flat, slight uphill, uphill), per car, with drive count, distance, average net climb and total ascent per km, consumption in Wh/km, and the difference from flat drives in percent. Net climb (ascent minus descent) is used because GPS elevation noise inflates ascent and descent alike. Consumption is TeslaMate's rated range used x the car's efficiency. Use it to explain why a mountain route used more energy, or to adjust an estimate from get_trip_energy_estimate for a hilly route."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look. Omit for the whole history."
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only drives at least this long; short drives have noisy consumption."
+default = 5.0
+minimum = 0.5
+maximum = 1000
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "climb"
+type = "string"
+description = "Net climb band, in metres of elevation gained or lost per km driven."
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "avg_net_climb_m_per_km"
+type = "number"
+description = "Distance-weighted average of (ascent - descent) / distance."
+
+[[output]]
+name = "avg_ascent_m_per_km"
+type = "number"
+description = "Distance-weighted average total ascent per km, noise included."
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Distance-weighted consumption."
+
+[[output]]
+name = "vs_flat_pct"
+type = "number"
+description = "Consumption compared with the same car's flat drives, in percent."

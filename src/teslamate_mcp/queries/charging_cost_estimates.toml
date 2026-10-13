@@ -1,0 +1,107 @@
+name = "get_charging_cost_estimates"
+description = "Estimated costs for charging sessions that have no cost recorded in TeslaMate (skipping plug-ins that added under 0.1 kWh), newest first, so cost reports stop undercounting. Each session takes the first basis that applies: free Supercharging (car setting) on a Tesla Supercharger; the price_per_kwh argument (plus session_fee); the session's TeslaMate geofence tariff; the median price per kWh of the nearest-in-time costed sessions at the same address; or the median price of costed sessions with the same charger type (supercharger, other_dc, ac). Billed energy is the larger of kWh drawn and kWh added. Returns the session id, when and where, charger type, kWh, the estimated cost and price per kWh used, and the basis; estimated_cost is null when nothing applies. Use price_per_kwh with location or charger_type for the user's own tariff (e.g. home electricity). To store an estimate, pass it to set_charging_cost when cost writes are enabled."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "start_date"
+type = "string"
+description = "Earliest local calendar date a session may start on, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "end_date"
+type = "string"
+description = "Latest local calendar date a session may start on, ISO format (YYYY-MM-DD)."
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the session's address, city, and geofence name."
+
+[[params]]
+name = "charger_type"
+type = "string"
+description = "Only sessions of this type: ac, dc (any fast charger), supercharger (Tesla), or other_dc (third-party fast chargers)."
+default = "any"
+enum = ["any", "ac", "dc", "supercharger", "other_dc"]
+
+[[params]]
+name = "price_per_kwh"
+type = "number"
+description = "Price per billed kWh to apply to every matching session (except free Supercharging), in the currency configured in TeslaMate. Omit to use tariffs and past prices."
+minimum = 0
+maximum = 1000
+
+[[params]]
+name = "session_fee"
+type = "number"
+description = "Fixed fee added per session, only together with price_per_kwh."
+minimum = 0
+maximum = 10000
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of sessions returned."
+default = 100
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "UTC."
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Start in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "location"
+type = "string"
+description = "Geofence name, else the reverse-geocoded address."
+
+[[output]]
+name = "charger_type"
+type = "string"
+description = "supercharger, other_dc, or ac."
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "energy_billed_kwh"
+type = "number"
+description = "The larger of kWh drawn from the charger and kWh added to the battery."
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "estimated_cost"
+type = "number"
+description = "In the currency configured in TeslaMate; null when no basis applies."
+
+[[output]]
+name = "price_per_kwh"
+type = "number"
+description = "Price per billed kWh behind the estimate (null for per-minute tariffs)."
+
+[[output]]
+name = "basis"
+type = "string"
+description = "Where the estimate came from."

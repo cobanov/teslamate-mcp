@@ -1,5 +1,5 @@
 name = "get_current_car_status"
-description = "Returns the latest recorded snapshot per car: battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. Optional filters: car_name."
+description = "Returns the latest recorded snapshot per car: what the car is doing now (car_state: driving, charging, online, asleep, or offline) and since when, battery level (%), rated range (km), odometer (km), outside temperature (°C), climate state, GPS coordinates, nearest address, and last-update timestamp. When last_update is old, TeslaMate has lost contact with the car and car_state is stale. Optional filters: car_name."
 
 [[params]]
 name = "car_name"
@@ -49,7 +49,18 @@ type = "string"
 [[output]]
 name = "state"
 type = "string"
+description = "State or region of the nearest address (not the car's state; see car_state)."
 
 [[output]]
 name = "last_update"
 type = "string"
+
+[[output]]
+name = "car_state"
+type = "string"
+description = "driving, charging, online (awake, parked), asleep, or offline, from TeslaMate's state log."
+
+[[output]]
+name = "car_state_since"
+type = "string"
+description = "When the current car_state began (UTC)."

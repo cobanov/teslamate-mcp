@@ -1,0 +1,100 @@
+name = "get_fuel_savings"
+description = "How much driving electric saved compared with a combustion car: the fuel the same distance would have taken and cost, against what charging cost over the same window, per car. Charging sessions with no recorded cost are priced at electricity_price_per_kwh when given; otherwise they are left out, and cost_coverage_pct below 100 means the electricity cost (and so the savings) is incomplete: pass electricity_price_per_kwh, or look at get_charging_cost_estimates. Returns distance, fuel liters and cost, charging sessions and kWh, recorded and estimated charging cost, coverage, savings, and cost per 100 km both ways. Prices are in the currency configured in TeslaMate's costs. For miles per gallon, convert to L/100 km first (235.2 / US mpg, 282.5 / UK mpg)."
+
+[[params]]
+name = "fuel_price_per_liter"
+type = "number"
+description = "Fuel price per liter, in the same currency as TeslaMate's charging costs."
+required = true
+minimum = 0
+maximum = 1000
+
+[[params]]
+name = "fuel_consumption_l_per_100km"
+type = "number"
+description = "Consumption of the combustion car to compare against, in L/100 km."
+default = 7.0
+minimum = 1
+maximum = 40
+
+[[params]]
+name = "electricity_price_per_kwh"
+type = "number"
+description = "Price per billed kWh for charging sessions with no recorded cost. Omit to leave them out."
+minimum = 0
+maximum = 1000
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to compare."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "fuel_liters"
+type = "number"
+description = "Fuel the same distance would have taken."
+
+[[output]]
+name = "fuel_cost"
+type = "number"
+
+[[output]]
+name = "charging_sessions"
+type = "integer"
+
+[[output]]
+name = "kwh_added"
+type = "number"
+
+[[output]]
+name = "recorded_charging_cost"
+type = "number"
+description = "Sum of the costs stored in TeslaMate."
+
+[[output]]
+name = "sessions_without_cost"
+type = "integer"
+
+[[output]]
+name = "estimated_missing_cost"
+type = "number"
+description = "Sessions with no cost priced at electricity_price_per_kwh; null when it was not given."
+
+[[output]]
+name = "electricity_cost"
+type = "number"
+description = "Recorded plus estimated charging cost."
+
+[[output]]
+name = "cost_coverage_pct"
+type = "number"
+description = "Share of the billed kWh that electricity_cost covers."
+
+[[output]]
+name = "savings"
+type = "number"
+description = "fuel_cost minus electricity_cost."
+
+[[output]]
+name = "electricity_cost_per_100km"
+type = "number"
+
+[[output]]
+name = "fuel_cost_per_100km"
+type = "number"

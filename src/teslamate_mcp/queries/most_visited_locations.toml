@@ -1,5 +1,5 @@
 name = "get_most_visited_locations"
-description = "Most visited locations across the whole fleet: address, city, state, visit count (drives starting or ending there), and total time spent (minutes). Returns the top 15 locations by default. Optional filters: car_name, days, limit."
+description = "Most visited locations across the whole fleet: address, city, state, visit count (drives starting or ending there), and the minutes spent driving on those drives (not time parked there; get_visited_places has parked hours and coordinates). Returns the top 15 locations by default. Optional filters: car_name, days, limit."
 
 [[params]]
 name = "car_name"
@@ -39,3 +39,4 @@ type = "integer"
 [[output]]
 name = "total_time_spent_min"
 type = "integer"
+description = "Total duration of the drives that started or ended there, in minutes: driving time, not time parked."

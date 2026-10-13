@@ -1,6 +1,6 @@
 [project]
 name = "teslamate-mcp"
-version = "0.10.1"
+version = "0.13.5"
 description = "A Model Context Protocol (MCP) server that exposes your TeslaMate database to AI assistants over stdio and streamable HTTP."
 readme = "README.md"
 license = { text = "MIT" }
@@ -32,6 +32,7 @@ dependencies = [
     "psycopg[binary]>=3.2.9",
     "psycopg-pool>=3.2.0",
     "pydantic>=2.8",
+    "pyjwt[crypto]>=2.8",
     "pydantic-settings>=2.5",
     "click>=8.1.0",
     "uvicorn>=0.30.0",
@@ -47,6 +48,7 @@ teslamate-mcp = "teslamate_mcp.cli:main"
 Homepage = "https://github.com/cobanov/teslamate-mcp"
 Repository = "https://github.com/cobanov/teslamate-mcp"
 Issues = "https://github.com/cobanov/teslamate-mcp/issues"
+Upstream = "https://github.com/cobanov/teslamate-mcp"
 
 [build-system]
 requires = ["hatchling"]

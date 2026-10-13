@@ -1,8 +1,14 @@
 SELECT COALESCE(g.name, 'Ungeofenced') AS geofence,
     COUNT(*) AS sessions,
+    COUNT(*) FILTER (WHERE cp.cost IS NULL) AS sessions_without_cost,
     ROUND(SUM(cp.charge_energy_added)::numeric, 1) AS kwh_added,
     SUM(cp.cost) AS total_cost,
-    ROUND(SUM(cp.cost) / NULLIF(SUM(cp.charge_energy_added)::numeric, 0), 3) AS avg_cost_per_kwh
+    -- Over costed sessions only; see charging_costs.sql.
+    ROUND(
+        SUM(cp.cost)
+            / NULLIF(SUM(cp.charge_energy_added) FILTER (WHERE cp.cost IS NOT NULL)::numeric, 0),
+        3
+    ) AS avg_cost_per_kwh
 FROM charging_processes cp
     JOIN cars c ON cp.car_id = c.id
     LEFT JOIN geofences g ON cp.geofence_id = g.id

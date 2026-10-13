@@ -27,8 +27,6 @@ _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
 _STRING_SINGLE = re.compile(r"'(?:''|[^'])*'")
 _STRING_DOUBLE = re.compile(r'"(?:""|[^"])*"')
 
-_HAS_LIMIT = re.compile(r"\bLIMIT\b\s+\d+", re.IGNORECASE)
-
 
 class SqlValidationError(ValueError):
     """Raised when a user-supplied SQL query fails the cheap pre-check."""
@@ -69,18 +67,6 @@ def validate_sql(sql: str) -> None:
         raise SqlValidationError("Query contains a forbidden keyword")
 
 
-def enforce_limit(sql: str, default_limit: int) -> str:
-    """Wrap the query in a subquery with LIMIT if it has no LIMIT of its own.
-
-    Wrapping (instead of appending) keeps the user's ORDER BY semantics correct
-    and works even when the query is a CTE that ends with a SELECT.
-    """
-    body = sql.strip().rstrip(";").rstrip()
-    if _HAS_LIMIT.search(body):
-        return body
-    return f"SELECT * FROM ({body}) AS _capped LIMIT {default_limit}"
-
-
 def register_custom_sql(
     mcp: MCPServer,
     *,
@@ -99,9 +85,11 @@ def register_custom_sql(
     description = (
         "Execute a custom read-only SQL query against the TeslaMate database. "
         "Only SELECT (and WITH ... SELECT) statements are accepted. The query "
-        "runs in a READ ONLY transaction with statement_timeout enforced; if "
-        "no LIMIT is supplied, the result is automatically capped. Call "
-        "`get_database_schema` first to learn the available tables and columns."
+        "runs in a READ ONLY transaction with a statement timeout and returns at "
+        f"most {row_limit} rows, whatever LIMIT it has: aggregate, or page with "
+        "ORDER BY plus LIMIT/OFFSET, for more. Values are metric and timestamps "
+        "UTC, as stored by TeslaMate. Call `get_database_schema` first to learn "
+        "the available tables and columns."
     )
 
     async def run_sql(
@@ -117,14 +105,13 @@ def register_custom_sql(
         except SqlValidationError as exc:
             logger.warning("run_sql rejected query: %s", exc)
             raise
-        capped = enforce_limit(query, row_limit)
         pool = ctx.request_context.lifespan_context.pool
 
         logger.info(
             "run_sql executing %d-char query (timeout %dms)", len(query), statement_timeout_ms
         )
         start = time.perf_counter()
-        rows = await fetch_readonly(pool, capped, statement_timeout_ms)
+        rows = await fetch_readonly(pool, query, statement_timeout_ms, max_rows=row_limit)
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         logger.info("run_sql returned %d row(s) in %dms", len(rows), elapsed_ms)
         return rows

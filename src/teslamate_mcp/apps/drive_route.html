@@ -68,8 +68,17 @@
   .tick-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
   .map-frame { fill: none; stroke: var(--grid); stroke-width: 1; }
   .route-line { fill: none; stroke: var(--route); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .route-halo { fill: none; stroke: var(--surface-1); stroke-width: 5.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.85; }
+  .attribution { font-size: 9px; fill: var(--text-secondary); }
+  .map-label { paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; stroke-linejoin: round; }
   .scale-line { stroke: var(--baseline); stroke-width: 2; }
   .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .panel-title { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
+  .profile-area { fill: var(--route); opacity: 0.14; }
+  .profile-line { fill: none; stroke: var(--route); stroke-width: 1.5; stroke-linejoin: round; }
+  #profile { margin-top: 6px; }
   .tooltip {
     position: absolute; top: 0; left: 0; pointer-events: none; display: none;
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
@@ -102,6 +111,7 @@
   </div>
   <div class="chart-wrap" id="chartWrap" hidden>
     <svg id="chart" role="img" tabindex="0" aria-label="Drive route map. Use arrow keys to step along the track."></svg>
+    <svg id="profile" role="img" aria-label="Elevation profile along the route. Hover to find the place on the map." style="display:none"></svg>
     <div class="tooltip" id="tooltip"></div>
   </div>
   <div class="state" id="state">Waiting for the route data…</div>
@@ -151,27 +161,41 @@ window.addEventListener("message", (event) => {
   if (msg.method === "ui/notifications/host-context-changed") {
     const p = msg.params || {};
     if (p.theme) applyTheme(p.theme);
-    if (p.containerDimensions) render();
+    if (p.theme || p.containerDimensions) render();
     return;
   }
   if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
     post({ jsonrpc: "2.0", id: msg.id, result: {} });
     return;
   }
+  if (msg.method === "ping" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  // Answer any other host request so it fails fast instead of timing out.
+  if (msg.method && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+  }
 });
 
+// Params per McpUiInitializeRequest (ext-apps 2026-01-26): appInfo,
+// appCapabilities and protocolVersion are all required. Hosts validate them
+// and send tool-input/tool-result only after `initialized`, so a rejected
+// handshake leaves the view empty.
 request("ui/initialize", {
   protocolVersion: "2026-01-26",
-  capabilities: {},
-  clientInfo: { name: "teslamate-drive-route", version: "1.0.0" },
-  appCapabilities: { availableDisplayModes: ["inline"] },
+  appInfo: { name: "teslamate-drive-route", version: "1.2.0" },
+  appCapabilities: {},
 }).then((res) => {
   const hc = (res && res.hostContext) || {};
   if (hc.theme) applyTheme(hc.theme);
   if (hc.timeZone) hostTimeZone = hc.timeZone;
   notify("ui/notifications/initialized");
   render();
-}).catch(() => { /* keep default theme; data may still arrive */ });
+}).catch((err) => {
+  console.error("[teslamate] ui/initialize rejected by host:", err);
+  showState("The chart could not connect to the host.");
+});
 
 /* ---------- data handling ---------- */
 let rows = [];
@@ -185,14 +209,31 @@ function onToolInput(args) {
   }
 }
 
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
 function onToolResult(result) {
   if (result.isError) {
     const text = (result.content || []).map((c) => c.text || "").join(" ");
     showState("Could not load the route. " + text);
     return;
   }
-  const sc = result.structuredContent;
-  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  rows = extractRows(result);
   if (!rows.length) {
     showState("No GPS positions recorded for this drive.");
     return;
@@ -239,6 +280,7 @@ function buildModel() {
     speed: r.speed_max_kmh,
     power: r.avg_power_kw,
     odo: r.odometer_km,
+    elev: r.elevation_m,
   })).filter((p) => p.lat != null && p.lon != null);
 }
 
@@ -264,6 +306,10 @@ function renderStats() {
     stats.push([first.soc + "% → " + last.soc + "%", "Battery level"]);
   }
   if (speeds.length) stats.push([Math.max(...speeds) + " km/h", "Top speed"]);
+  const elevs = points.map((p) => p.elev).filter((v) => v != null);
+  if (elevs.length > 1) {
+    stats.push([elevs[0] + " → " + elevs[elevs.length - 1] + " m", "Elevation"]);
+  }
   const box = document.getElementById("stats");
   box.replaceChildren(...stats.map(([v, l]) => {
     const d = document.createElement("div");
@@ -281,6 +327,7 @@ function renderTable() {
   const cols = [
     ["point_order", "#"], ["ts", "Time"], ["battery_level", "Battery %"],
     ["speed_max_kmh", "Max km/h"], ["avg_power_kw", "Avg kW"], ["odometer_km", "Odometer km"],
+    ["elevation_m", "Elevation m"],
   ];
   const table = document.createElement("table");
   const thead = document.createElement("thead");
@@ -307,7 +354,13 @@ function renderTable() {
 /* ---------- map ---------- */
 const NS = "http://www.w3.org/2000/svg";
 const M = { pad: 18 };
-const KM_PER_DEG_LAT = 111.32;
+const TILE = 256;
+const MAX_TILE_ZOOM = 16; // the gray canvas basemap stops at 16
+// Filled in by the server: the basemap host when MAP_TILES is on, else "".
+// Tiles are an optional backdrop - the route draws the same without them.
+const TILE_HOST_SETTING = "__MAP_TILE_HOST__";
+// Left unreplaced (starts with "__") means the view was loaded outside the server.
+const TILE_HOST = TILE_HOST_SETTING.startsWith("__") ? "" : TILE_HOST_SETTING;
 let geom = null;
 
 function el(name, attrs) {
@@ -316,33 +369,55 @@ function el(name, attrs) {
   return node;
 }
 
+// Web Mercator in zoom-0 pixels (the world is TILE px wide), matching the tiles.
+function mercX(lon) { return ((lon + 180) / 360) * TILE; }
+function mercY(lat) {
+  const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE;
+}
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  if (t) return t === "dark";
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
 function render() {
   if (!points.length) { reportSize(); return; }
   const svg = document.getElementById("chart");
   const width = Math.max(280, svg.parentElement.clientWidth || 280);
 
-  // Equirectangular projection: scale longitude by cos(mid-latitude) so the
-  // track keeps its real-world aspect ratio, then fit it into the viewport.
-  const lats = points.map((p) => p.lat), lons = points.map((p) => p.lon);
-  const latMin = Math.min(...lats), latMax = Math.max(...lats);
-  const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
-  const cosMid = Math.max(0.05, Math.cos(((latMin + latMax) / 2) * Math.PI / 180));
-  const spanX = Math.max((lonMax - lonMin) * cosMid, 1e-6);
-  const spanY = Math.max(latMax - latMin, 1e-6);
+  const xs = points.map((p) => mercX(p.lon)), ys = points.map((p) => mercY(p.lat));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const spanX = Math.max(x1 - x0, 1e-7), spanY = Math.max(y1 - y0, 1e-7);
 
   const plotW = width - 2 * M.pad;
   const height = Math.round(Math.min(340, Math.max(180, plotW * (spanY / spanX))) + 2 * M.pad);
   const plotH = height - 2 * M.pad;
-  const scale = Math.min(plotW / spanX, plotH / spanY);
+  // Screen px per zoom-0 px; capped so a very short drive doesn't zoom past
+  // what the basemap offers.
+  const scale = Math.min(plotW / spanX, plotH / spanY, Math.pow(2, MAX_TILE_ZOOM + 1));
   const offX = M.pad + (plotW - spanX * scale) / 2;
   const offY = M.pad + (plotH - spanY * scale) / 2;
-  const x = (lon) => offX + (lon - lonMin) * cosMid * scale;
-  const y = (lat) => offY + (latMax - lat) * scale;
+  const sx = (mx) => offX + (mx - x0) * scale;
+  const sy = (my) => offY + (my - y0) * scale;
+  const x = (lon) => sx(mercX(lon));
+  const y = (lat) => sy(mercY(lat));
   geom = { x, y, width, height };
 
   svg.setAttribute("viewBox", "0 0 " + width + " " + height);
   svg.setAttribute("height", height);
   svg.replaceChildren();
+
+  const clip = el("clipPath", { id: "mapClip" });
+  clip.append(el("rect", { x: 0, y: 0, width, height, rx: 6 }));
+  const defs = el("defs", {});
+  defs.append(clip);
+  svg.append(defs);
+
+  if (TILE_HOST) svg.append(tileLayer(scale, offX, offY, x0, y0, width, height));
+
   svg.append(el("rect", {
     x: 0.5, y: 0.5, width: width - 1, height: height - 1, rx: 6, class: "map-frame",
   }));
@@ -350,6 +425,7 @@ function render() {
   const d = points
     .map((p, i) => (i ? "L" : "M") + x(p.lon).toFixed(1) + " " + y(p.lat).toFixed(1))
     .join(" ");
+  svg.append(el("path", { d, class: "route-halo" }));
   svg.append(el("path", { d, class: "route-line" }));
 
   const start = points[0], end = points[points.length - 1];
@@ -361,7 +437,9 @@ function render() {
   }));
 
   // Scale bar: pick a round distance that spans at most ~30% of the width.
-  const kmPerPx = 1 / (scale / KM_PER_DEG_LAT);
+  // Mercator stretches with latitude, so measure at the route's middle.
+  const midLat = (points.reduce((a, p) => a + p.lat, 0)) / points.length;
+  const kmPerPx = (40075.016686 * Math.cos(midLat * Math.PI / 180)) / (TILE * scale);
   const targetKm = kmPerPx * plotW * 0.3;
   const niceKm = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200]
     .filter((v) => v <= targetKm).pop() || 0.1;
@@ -370,9 +448,19 @@ function render() {
   svg.append(el("line", {
     x1: M.pad, x2: M.pad + barPx, y1: barY, y2: barY, class: "scale-line",
   }));
-  const barLab = el("text", { x: M.pad + barPx + 6, y: barY + 3, class: "tick-label" });
+  const barLab = el("text", { x: M.pad + barPx + 6, y: barY + 3, class: "tick-label map-label" });
   barLab.textContent = niceKm < 1 ? niceKm * 1000 + " m" : niceKm + " km";
   svg.append(barLab);
+
+  if (TILE_HOST) {
+    const attr = el("text", {
+      x: width - 6, y: height - 5, "text-anchor": "end", class: "attribution map-label",
+    });
+    attr.textContent = "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors";
+    svg.append(attr);
+  }
+
+  renderProfile(width);
 
   const hover = el("g", { id: "hoverLayer", style: "display:none" });
   hover.append(el("circle", { id: "hoverDot", r: 4.5, fill: "var(--route)", class: "hover-dot" }));
@@ -380,6 +468,148 @@ function render() {
   bindPointer(svg);
   if (hoverIndex >= 0) showHover(hoverIndex);
   reportSize();
+}
+
+// Basemap tiles covering the viewport. The tile zoom is the largest one not
+// finer than the view; tiles are then scaled up by at most 2x to fit exactly.
+function tileLayer(scale, offX, offY, x0, y0, width, height) {
+  const z = Math.max(0, Math.min(MAX_TILE_ZOOM, Math.floor(Math.log2(scale))));
+  const n = Math.pow(2, z);
+  const tilePx = (TILE / n) * scale; // on-screen size of one tile at zoom z
+  // Viewport edges in zoom-0 px, then in tile indices at zoom z.
+  const wx0 = x0 + (0 - offX) / scale, wx1 = x0 + (width - offX) / scale;
+  const wy0 = y0 + (0 - offY) / scale, wy1 = y0 + (height - offY) / scale;
+  const tx0 = Math.floor((wx0 / TILE) * n), tx1 = Math.floor((wx1 / TILE) * n);
+  const ty0 = Math.max(0, Math.floor((wy0 / TILE) * n));
+  const ty1 = Math.min(n - 1, Math.floor((wy1 / TILE) * n));
+  const style = isDark() ? "World_Dark_Gray_Base" : "World_Light_Gray_Base";
+
+  const g = el("g", { "clip-path": "url(#mapClip)", class: "tiles" });
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const wrapped = ((tx % n) + n) % n;
+      const img = el("image", {
+        // Esri MapServer tile order is z/row/column (y before x).
+        href: TILE_HOST + "/ArcGIS/rest/services/Canvas/" + style + "/MapServer/tile/"
+          + z + "/" + ty + "/" + wrapped,
+        x: (offX + ((tx * TILE) / n - x0) * scale).toFixed(2),
+        y: (offY + ((ty * TILE) / n - y0) * scale).toFixed(2),
+        // +0.5px overlap hides hairline seams between scaled tiles.
+        width: (tilePx + 0.5).toFixed(2),
+        height: (tilePx + 0.5).toFixed(2),
+        preserveAspectRatio: "none",
+      });
+      img.addEventListener("error", () => img.remove());
+      g.append(img);
+    }
+  }
+  return g;
+}
+
+/* ---------- elevation profile ---------- */
+const PROFILE = { height: 96, top: 16, bottom: 18, left: 40, right: 10 };
+let profileGeom = null;
+
+function niceTicks(min, max, count) {
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  const step0 = span / Math.max(1, count);
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
+  const lo = Math.floor(min / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= max + 1e-9; v += step) if (v >= min - 1e-9) ticks.push(+v.toFixed(6));
+  return ticks;
+}
+
+// Elevation along the route, under the map: by distance driven when the
+// odometer is known, else by point order. Hidden when fewer than two points
+// carry an elevation (older TeslaMate versions did not record it).
+function renderProfile(width) {
+  const svg = document.getElementById("profile");
+  const idx = [];
+  points.forEach((p, i) => { if (p.elev != null) idx.push(i); });
+  if (idx.length < 2) { svg.style.display = "none"; profileGeom = null; return; }
+  svg.style.display = "";
+  const byOdo = idx.every((i) => points[i].odo != null);
+  const along = (i) => (byOdo ? points[i].odo - points[idx[0]].odo : i);
+  const a0 = along(idx[0]), a1 = along(idx[idx.length - 1]);
+  const elevs = idx.map((i) => points[i].elev);
+  let lo = Math.min(...elevs), hi = Math.max(...elevs);
+  if (hi - lo < 20) { const mid = (hi + lo) / 2; lo = mid - 10; hi = mid + 10; }
+  const pad = (hi - lo) * 0.1;
+  lo -= pad; hi += pad;
+  const P = PROFILE;
+  const plotW = width - P.left - P.right, plotH = P.height - P.top - P.bottom;
+  const x = (i) => P.left + (a1 === a0 ? plotW / 2 : ((along(i) - a0) / (a1 - a0)) * plotW);
+  const y = (e) => P.top + plotH - ((e - lo) / (hi - lo)) * plotH;
+  profileGeom = { x, y };
+
+  svg.setAttribute("viewBox", "0 0 " + width + " " + P.height);
+  svg.setAttribute("height", P.height);
+  svg.replaceChildren();
+  const title = el("text", { x: P.left, y: P.top - 5, class: "panel-title" });
+  title.textContent = "Elevation (m)";
+  svg.append(title);
+  let ticks = niceTicks(lo, hi, 4);
+  if (ticks.length < 2) ticks = niceTicks(lo, hi, 6); // a step just too coarse for 4
+  for (const tv of ticks) {
+    svg.append(el("line", { x1: P.left, x2: width - P.right, y1: y(tv), y2: y(tv), class: "grid-line" }));
+    const lab = el("text", { x: P.left - 6, y: y(tv) + 3, "text-anchor": "end", class: "tick-label" });
+    lab.textContent = String(tv);
+    svg.append(lab);
+  }
+  const base = P.top + plotH;
+  const line = idx
+    .map((i, k) => (k ? "L" : "M") + x(i).toFixed(1) + " " + y(points[i].elev).toFixed(1))
+    .join(" ");
+  svg.append(el("path", {
+    d: line + " L" + x(idx[idx.length - 1]).toFixed(1) + " " + base
+      + " L" + x(idx[0]).toFixed(1) + " " + base + " Z",
+    class: "profile-area",
+  }));
+  svg.append(el("path", { d: line, class: "profile-line" }));
+  if (byOdo) {
+    const start = el("text", { x: P.left, y: P.height - 4, class: "tick-label" });
+    start.textContent = "0 km";
+    const end = el("text", { x: width - P.right, y: P.height - 4, "text-anchor": "end", class: "tick-label" });
+    end.textContent = (a1 - a0).toFixed(1) + " km";
+    svg.append(start, end);
+  }
+  const marker = el("g", { id: "profileMarker", style: "display:none" });
+  marker.append(el("line", { id: "profileCross", y1: P.top, y2: base, class: "crosshair" }));
+  marker.append(el("circle", { id: "profileDot", r: 3.5, fill: "var(--route)", class: "hover-dot" }));
+  svg.append(marker);
+
+  // Hovering the profile finds the place on the map.
+  svg.onpointermove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * width;
+    let best = idx[0], bestDist = Infinity;
+    for (const i of idx) {
+      const d = Math.abs(x(i) - px);
+      if (d < bestDist) { bestDist = d; best = i; }
+    }
+    showHover(best);
+  };
+  svg.onpointerleave = () => hideHover();
+}
+
+function showProfileMarker(i) {
+  const marker = document.getElementById("profileMarker");
+  if (!marker || !profileGeom) return;
+  const p = points[i];
+  if (p.elev == null) { marker.style.display = "none"; return; }
+  const cx = profileGeom.x(i);
+  const cross = document.getElementById("profileCross");
+  cross.setAttribute("x1", cx); cross.setAttribute("x2", cx);
+  const dot = document.getElementById("profileDot");
+  dot.setAttribute("cx", cx); dot.setAttribute("cy", profileGeom.y(p.elev));
+  marker.style.display = "";
+}
+function hideProfileMarker() {
+  const marker = document.getElementById("profileMarker");
+  if (marker) marker.style.display = "none";
 }
 
 function bindPointer(svg) {
@@ -418,6 +648,7 @@ function showHover(i) {
   layer.style.display = "";
   const dot = document.getElementById("hoverDot");
   dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+  showProfileMarker(i);
   const tip = document.getElementById("tooltip");
   tip.replaceChildren();
   const t = document.createElement("div"); t.className = "t";
@@ -426,6 +657,7 @@ function showHover(i) {
   const rowsData = [
     [p.speed != null ? p.speed + " km/h" : "–", "Max speed"],
     [p.soc != null ? p.soc + "%" : "–", "Battery"],
+    [p.elev != null ? p.elev + " m" : "–", "Elevation"],
     [p.power != null ? p.power + " kW" : "–", "Avg power"],
   ];
   for (const [val, lab] of rowsData) {
@@ -447,6 +679,7 @@ function showHover(i) {
 function hideHover() {
   hoverIndex = -1;
   document.getElementById("hoverLayer").style.display = "none";
+  hideProfileMarker();
   document.getElementById("tooltip").style.display = "none";
 }
 

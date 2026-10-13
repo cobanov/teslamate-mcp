@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Visited places</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --route: #2a78d6;
+    --marker-start: #1d8a63;
+    --marker-end: #c9375f;
+    --marker-charge: #d68a00;
+    --border: rgba(11,11,11,0.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --route: #3987e5;
+      --marker-start: #27a578;
+      --marker-end: #d9527a;
+      --marker-charge: #f2a93b;
+      --border: rgba(255,255,255,0.10);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --route: #3987e5;
+    --marker-start: #27a578;
+    --marker-end: #d9527a;
+    --marker-charge: #f2a93b;
+    --border: rgba(255,255,255,0.10);
+  }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-1);
+    color: var(--text-primary);
+    padding: 14px 14px 10px;
+  }
+  header h1 { font-size: 14px; font-weight: 600; }
+  header .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 18px; margin: 10px 0 4px; }
+  .stat .v { font-size: 15px; font-weight: 600; }
+  .stat .l { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 6px; font-size: 12px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chart-wrap { position: relative; margin-top: 6px; }
+  svg { display: block; width: 100%; }
+  svg:focus { outline: 1.5px solid var(--route); outline-offset: 2px; border-radius: 2px; }
+  .tick-label { font-size: 10px; fill: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .map-frame { fill: none; stroke: var(--grid); stroke-width: 1; }
+  .route-line { fill: none; stroke: var(--route); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .route-halo { fill: none; stroke: var(--surface-1); stroke-width: 5.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.85; }
+  .attribution { font-size: 9px; fill: var(--text-secondary); }
+  .map-label { paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; stroke-linejoin: round; }
+  .scale-line { stroke: var(--baseline); stroke-width: 2; }
+  .hover-dot { stroke: var(--surface-1); stroke-width: 2; }
+  .panel-title { font-size: 11px; fill: var(--text-secondary); font-weight: 600; }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; stroke-dasharray: 3 3; }
+  .profile-area { fill: var(--route); opacity: 0.14; }
+  .profile-line { fill: none; stroke: var(--route); stroke-width: 1.5; stroke-linejoin: round; }
+  #profile { margin-top: 6px; }
+  .tooltip {
+    position: absolute; top: 0; left: 0; pointer-events: none; display: none;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12); padding: 7px 10px; font-size: 12px;
+    min-width: 130px; z-index: 2;
+  }
+  .tooltip .t { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .tooltip .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 2px; }
+  .tooltip .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tooltip .lab { color: var(--text-secondary); font-size: 11px; }
+  .state { padding: 24px 4px; font-size: 13px; color: var(--text-secondary); }
+  details { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+  summary { font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 11px; }
+  th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; }
+  .place { stroke: var(--surface-1); stroke-width: 1.5; fill-opacity: 0.55; }
+  .place-hover { stroke: var(--text-primary); stroke-width: 2; fill: none; }
+  .legend .ring { width: 12px; height: 12px; border-radius: 50%; flex: none; opacity: 0.7; }
+</style>
+</head>
+<body>
+<div class="viz-root" id="root">
+  <header>
+    <h1 id="title">Visited places</h1>
+    <div class="sub" id="subtitle">Waiting for data…</div>
+  </header>
+  <div class="stats" id="stats" hidden></div>
+  <div class="legend" id="legend" hidden>
+    <div class="item"><span class="ring" style="background:var(--route)"></span>Parked here (size: arrivals)</div>
+    <div class="item"><span class="ring" style="background:var(--marker-charge)"></span>Charged here</div>
+  </div>
+  <div class="chart-wrap" id="chartWrap" hidden>
+    <svg id="chart" role="img" tabindex="0" aria-label="Map of the places the car parked at. Use arrow keys to step through them, most visited first."></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+  <div class="state" id="state">Waiting for the places…</div>
+  <details id="tableWrap" hidden>
+    <summary>Places</summary>
+    <div id="tableBox" style="overflow-x:auto"></div>
+  </details>
+</div>
+<script>
+"use strict";
+/* ---------- MCP Apps bridge (ext-apps 2026-01-26, JSON-RPC over postMessage) ---------- */
+let nextId = 1;
+const pending = new Map();
+let hostTimeZone = null;
+
+function post(msg) { window.parent.postMessage(msg, "*"); }
+function request(method, params) {
+  const id = nextId++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    post({ jsonrpc: "2.0", id, method, params });
+  });
+}
+function notify(method, params) { post({ jsonrpc: "2.0", method, params: params || {} }); }
+
+function applyTheme(theme) {
+  if (theme === "dark" || theme === "light") {
+    document.documentElement.dataset.theme = theme;
+  }
+}
+
+window.addEventListener("message", (event) => {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
+  if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); msg.error ? p.reject(msg.error) : p.resolve(msg.result); }
+    return;
+  }
+  if (msg.method === "ui/notifications/tool-result") { onToolResult(msg.params || {}); return; }
+  if (msg.method === "ui/notifications/tool-input") {
+    onToolInput((msg.params && msg.params.arguments) || {}); return;
+  }
+  if (msg.method === "ui/notifications/tool-cancelled") {
+    showState("Tool call was cancelled."); return;
+  }
+  if (msg.method === "ui/notifications/host-context-changed") {
+    const p = msg.params || {};
+    if (p.theme) applyTheme(p.theme);
+    if (p.theme || p.containerDimensions) render();
+    return;
+  }
+  if (msg.method === "ui/resource-teardown" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  if (msg.method === "ping" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  // Answer any other host request so it fails fast instead of timing out.
+  if (msg.method && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+  }
+});
+
+// Params per McpUiInitializeRequest (ext-apps 2026-01-26): appInfo,
+// appCapabilities and protocolVersion are all required. Hosts validate them
+// and send tool-input/tool-result only after `initialized`, so a rejected
+// handshake leaves the view empty.
+request("ui/initialize", {
+  protocolVersion: "2026-01-26",
+  appInfo: { name: "teslamate-visited-places", version: "1.0.0" },
+  appCapabilities: {},
+}).then((res) => {
+  const hc = (res && res.hostContext) || {};
+  if (hc.theme) applyTheme(hc.theme);
+  if (hc.timeZone) hostTimeZone = hc.timeZone;
+  notify("ui/notifications/initialized");
+  render();
+}).catch((err) => {
+  console.error("[teslamate] ui/initialize rejected by host:", err);
+  showState("The chart could not connect to the host.");
+});
+
+/* ---------- data handling ---------- */
+let rows = [];
+let hoverIndex = -1;
+let subtitleSet = false;
+
+function onToolInput(args) {
+  const bits = [];
+  if (args && args.car_name) bits.push('cars matching "' + args.car_name + '"');
+  if (args && args.days) bits.push("last " + args.days + " days");
+  if (bits.length) { setText("subtitle", bits.join(" · ")); subtitleSet = true; }
+}
+
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
+function onToolResult(result) {
+  if (result.isError) {
+    const text = (result.content || []).map((c) => c.text || "").join(" ");
+    showState("Could not load the places. " + text);
+    return;
+  }
+  rows = extractRows(result);
+  buildModel();
+  if (!places.length) {
+    showState("No places with coordinates found.");
+    return;
+  }
+  document.getElementById("state").hidden = true;
+  document.getElementById("stats").hidden = false;
+  document.getElementById("legend").hidden = false;
+  document.getElementById("chartWrap").hidden = false;
+  document.getElementById("tableWrap").hidden = false;
+  renderStats();
+  renderTable();
+  render();
+}
+
+function showState(text) {
+  const el = document.getElementById("state");
+  el.hidden = false;
+  el.textContent = text;
+  reportSize();
+}
+function setText(id, text) { document.getElementById(id).textContent = text; }
+
+/* ---------- model ---------- */
+let places = []; // most visited first: {name, city, lat, lon, arrivals, hours, sessions, kwh, last}
+
+function parseUtc(s) {
+  if (typeof s !== "string") return null;
+  const iso = /(Z|[+-]\d\d:?\d\d)$/.test(s) ? s : s + "Z"; // TeslaMate stores naive UTC
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function buildModel() {
+  places = rows.map((r) => ({
+    name: r.location || "Unknown place",
+    city: r.city,
+    lat: r.latitude,
+    lon: r.longitude,
+    arrivals: r.arrivals || 0,
+    hours: r.parked_hours,
+    sessions: r.charging_sessions || 0,
+    kwh: r.kwh_added,
+    last: parseUtc(r.last_arrival),
+  })).filter((p) => p.lat != null && p.lon != null)
+    .sort((a, b) => b.arrivals - a.arrivals);
+}
+
+function shortName(s) {
+  const first = String(s).split(",")[0].trim();
+  return first.length > 40 ? first.slice(0, 39) + "…" : first;
+}
+function fmtHours(h) {
+  if (h == null) return "–";
+  return h >= 48 ? (h / 24).toFixed(1) + " days" : h.toFixed(1) + " h";
+}
+const dateFmt = () => new Intl.DateTimeFormat(undefined, {
+  day: "numeric", month: "short", year: "numeric", ...(hostTimeZone ? { timeZone: hostTimeZone } : {}),
+});
+
+function renderStats() {
+  const arrivals = places.reduce((a, p) => a + p.arrivals, 0);
+  const charging = places.filter((p) => p.sessions > 0).length;
+  const top = places[0];
+  const stats = [
+    [String(places.length), "Places"],
+    [String(arrivals), "Arrivals"],
+    [String(charging), "Places charged at"],
+    [shortName(top.name), "Most visited (" + top.arrivals + "×)"],
+  ];
+  const box = document.getElementById("stats");
+  box.replaceChildren(...stats.map(([v, l]) => {
+    const d = document.createElement("div");
+    d.className = "stat";
+    const dv = document.createElement("div"); dv.className = "v"; dv.textContent = v;
+    const dl = document.createElement("div"); dl.className = "l"; dl.textContent = l;
+    d.append(dv, dl);
+    return d;
+  }));
+  if (!subtitleSet) setText("subtitle", "Where the car parked, sized by arrivals");
+}
+
+function renderTable() {
+  const cols = ["Place", "City", "Arrivals", "Parked", "Charges", "kWh added", "Last arrival"];
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.append(...cols.map((label) => {
+    const th = document.createElement("th"); th.textContent = label; return th;
+  }));
+  thead.append(hr);
+  const tbody = document.createElement("tbody");
+  for (const p of places) {
+    const tr = document.createElement("tr");
+    for (const v of [shortName(p.name), p.city || "–", p.arrivals, fmtHours(p.hours), p.sessions,
+                     p.kwh == null ? "–" : p.kwh, p.last ? dateFmt().format(p.last) : "–"]) {
+      const td = document.createElement("td");
+      td.textContent = String(v);
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  document.getElementById("tableBox").replaceChildren(table);
+}
+
+/* ---------- map ---------- */
+const NS = "http://www.w3.org/2000/svg";
+const M = { pad: 18 };
+const TILE = 256;
+const MAX_TILE_ZOOM = 16; // the gray canvas basemap stops at 16
+// Filled in by the server: the basemap host when MAP_TILES is on, else "".
+// Tiles are an optional backdrop - the route draws the same without them.
+const TILE_HOST_SETTING = "__MAP_TILE_HOST__";
+// Left unreplaced (starts with "__") means the view was loaded outside the server.
+const TILE_HOST = TILE_HOST_SETTING.startsWith("__") ? "" : TILE_HOST_SETTING;
+let geom = null;
+
+function el(name, attrs) {
+  const node = document.createElementNS(NS, name);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  return node;
+}
+
+// Web Mercator in zoom-0 pixels (the world is TILE px wide), matching the tiles.
+function mercX(lon) { return ((lon + 180) / 360) * TILE; }
+function mercY(lat) {
+  const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI / 180);
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE;
+}
+
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  if (t) return t === "dark";
+  return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+}
+
+function radius(p) {
+  const max = places[0].arrivals || 1;
+  return 4 + 12 * Math.sqrt(p.arrivals / max);
+}
+
+function render() {
+  if (!places.length) { reportSize(); return; }
+  const svg = document.getElementById("chart");
+  const width = Math.max(280, svg.parentElement.clientWidth || 280);
+
+  const xs = places.map((p) => mercX(p.lon)), ys = places.map((p) => mercY(p.lat));
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  // A single place still needs a sensible window around it.
+  const spanX = Math.max(x1 - x0, 0.002), spanY = Math.max(y1 - y0, 0.002);
+  const cx0 = (x0 + x1) / 2 - spanX / 2, cy0 = (y0 + y1) / 2 - spanY / 2;
+
+  const pad = M.pad + 14; // room for the largest bubble
+  const plotW = width - 2 * pad;
+  const height = Math.round(Math.min(380, Math.max(220, plotW * (spanY / spanX))) + 2 * pad);
+  const plotH = height - 2 * pad;
+  const scale = Math.min(plotW / spanX, plotH / spanY, Math.pow(2, MAX_TILE_ZOOM + 1));
+  const offX = pad + (plotW - spanX * scale) / 2;
+  const offY = pad + (plotH - spanY * scale) / 2;
+  const x = (lon) => offX + (mercX(lon) - cx0) * scale;
+  const y = (lat) => offY + (mercY(lat) - cy0) * scale;
+  geom = { x, y, width, height };
+
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("height", height);
+  svg.replaceChildren();
+
+  const clip = el("clipPath", { id: "mapClip" });
+  clip.append(el("rect", { x: 0, y: 0, width, height, rx: 6 }));
+  const defs = el("defs", {});
+  defs.append(clip);
+  svg.append(defs);
+
+  if (TILE_HOST) svg.append(tileLayer(scale, offX, offY, cx0, cy0, width, height));
+  svg.append(el("rect", {
+    x: 0.5, y: 0.5, width: width - 1, height: height - 1, rx: 6, class: "map-frame",
+  }));
+
+  // Largest first, so smaller bubbles stay on top and reachable.
+  for (const p of places) {
+    const c = el("circle", {
+      cx: x(p.lon).toFixed(1), cy: y(p.lat).toFixed(1), r: radius(p).toFixed(1),
+      fill: p.sessions > 0 ? "var(--marker-charge)" : "var(--route)", class: "place",
+    });
+    const title = el("title", {});
+    title.textContent = shortName(p.name) + ": " + p.arrivals + " arrivals";
+    c.append(title);
+    svg.append(c);
+  }
+
+  // Scale bar, measured at the middle latitude (Mercator stretches with it).
+  const midLat = places.reduce((a, p) => a + p.lat, 0) / places.length;
+  const kmPerPx = (40075.016686 * Math.cos(midLat * Math.PI / 180)) / (TILE * scale);
+  const niceKm = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+    .filter((v) => v <= kmPerPx * plotW * 0.3).pop() || 0.1;
+  const barPx = niceKm / kmPerPx;
+  const barY = height - M.pad + 6;
+  svg.append(el("line", { x1: M.pad, x2: M.pad + barPx, y1: barY, y2: barY, class: "scale-line" }));
+  const barLab = el("text", { x: M.pad + barPx + 6, y: barY + 3, class: "tick-label map-label" });
+  barLab.textContent = niceKm < 1 ? niceKm * 1000 + " m" : niceKm + " km";
+  svg.append(barLab);
+
+  if (TILE_HOST) {
+    const attr = el("text", {
+      x: width - 6, y: height - 5, "text-anchor": "end", class: "attribution map-label",
+    });
+    attr.textContent = "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors";
+    svg.append(attr);
+  }
+
+  const hover = el("g", { id: "hoverLayer", style: "display:none" });
+  hover.append(el("circle", { id: "hoverRing", class: "place-hover" }));
+  svg.append(hover);
+  bindPointer(svg);
+  if (hoverIndex >= 0) showHover(hoverIndex);
+  reportSize();
+}
+
+// Basemap tiles covering the viewport. The tile zoom is the largest one not
+// finer than the view; tiles are then scaled up by at most 2x to fit exactly.
+function tileLayer(scale, offX, offY, x0, y0, width, height) {
+  const z = Math.max(0, Math.min(MAX_TILE_ZOOM, Math.floor(Math.log2(scale))));
+  const n = Math.pow(2, z);
+  const tilePx = (TILE / n) * scale; // on-screen size of one tile at zoom z
+  // Viewport edges in zoom-0 px, then in tile indices at zoom z.
+  const wx0 = x0 + (0 - offX) / scale, wx1 = x0 + (width - offX) / scale;
+  const wy0 = y0 + (0 - offY) / scale, wy1 = y0 + (height - offY) / scale;
+  const tx0 = Math.floor((wx0 / TILE) * n), tx1 = Math.floor((wx1 / TILE) * n);
+  const ty0 = Math.max(0, Math.floor((wy0 / TILE) * n));
+  const ty1 = Math.min(n - 1, Math.floor((wy1 / TILE) * n));
+  const style = isDark() ? "World_Dark_Gray_Base" : "World_Light_Gray_Base";
+
+  const g = el("g", { "clip-path": "url(#mapClip)", class: "tiles" });
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const wrapped = ((tx % n) + n) % n;
+      const img = el("image", {
+        // Esri MapServer tile order is z/row/column (y before x).
+        href: TILE_HOST + "/ArcGIS/rest/services/Canvas/" + style + "/MapServer/tile/"
+          + z + "/" + ty + "/" + wrapped,
+        x: (offX + ((tx * TILE) / n - x0) * scale).toFixed(2),
+        y: (offY + ((ty * TILE) / n - y0) * scale).toFixed(2),
+        // +0.5px overlap hides hairline seams between scaled tiles.
+        width: (tilePx + 0.5).toFixed(2),
+        height: (tilePx + 0.5).toFixed(2),
+        preserveAspectRatio: "none",
+      });
+      img.addEventListener("error", () => img.remove());
+      g.append(img);
+    }
+  }
+  return g;
+}
+
+function bindPointer(svg) {
+  svg.onpointermove = (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((ev.clientX - rect.left) / rect.width) * geom.width;
+    const py = ((ev.clientY - rect.top) / rect.height) * geom.height;
+    // The smallest bubble under the pointer wins, else the nearest within reach.
+    let best = -1, bestScore = Infinity;
+    places.forEach((p, i) => {
+      const dx = geom.x(p.lon) - px, dy = geom.y(p.lat) - py;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      const r = radius(p);
+      if (d > r + 8) return;
+      const score = d <= r ? r : 100 + d;
+      if (score < bestScore) { bestScore = score; best = i; }
+    });
+    if (best < 0) hideHover(); else showHover(best);
+  };
+  svg.onpointerleave = () => hideHover();
+  svg.onkeydown = (ev) => {
+    const last = places.length - 1;
+    let i = hoverIndex < 0 ? 0 : hoverIndex;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown") i = Math.min(last, i + 1);
+    else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") i = Math.max(0, i - 1);
+    else if (ev.key === "Home") i = 0;
+    else if (ev.key === "End") i = last;
+    else if (ev.key === "Escape") { hideHover(); return; }
+    else return;
+    ev.preventDefault();
+    showHover(i);
+  };
+}
+
+function showHover(i) {
+  hoverIndex = i;
+  const p = places[i];
+  const cx = geom.x(p.lon), cy = geom.y(p.lat);
+  document.getElementById("hoverLayer").style.display = "";
+  const ring = document.getElementById("hoverRing");
+  ring.setAttribute("cx", cx); ring.setAttribute("cy", cy); ring.setAttribute("r", radius(p) + 2);
+  const tip = document.getElementById("tooltip");
+  tip.replaceChildren();
+  const t = document.createElement("div"); t.className = "t";
+  t.textContent = shortName(p.name) + (p.city ? " · " + p.city : "");
+  tip.append(t);
+  const rowsData = [
+    [String(p.arrivals), "Arrivals"],
+    [fmtHours(p.hours), "Parked"],
+  ];
+  if (p.sessions > 0) rowsData.push([p.sessions + " · " + p.kwh + " kWh", "Charges"]);
+  if (p.last) rowsData.push([dateFmt().format(p.last), "Last arrival"]);
+  for (const [val, lab] of rowsData) {
+    const row = document.createElement("div"); row.className = "row";
+    const l = document.createElement("span"); l.className = "lab"; l.textContent = lab;
+    const v = document.createElement("span"); v.className = "val"; v.textContent = val;
+    row.append(l, v);
+    tip.append(row);
+  }
+  tip.style.display = "block";
+  const wrap = document.getElementById("chartWrap");
+  const svgEl = document.getElementById("chart");
+  const scalePx = svgEl.getBoundingClientRect().width / geom.width;
+  const pxLeft = cx * scalePx, pxTop = cy * scalePx;
+  const flip = pxLeft > wrap.clientWidth - tip.offsetWidth - 20;
+  tip.style.left = (flip ? pxLeft - tip.offsetWidth - 14 : pxLeft + 14) + "px";
+  tip.style.top = Math.max(4, pxTop - tip.offsetHeight / 2) + "px";
+}
+function hideHover() {
+  hoverIndex = -1;
+  document.getElementById("hoverLayer").style.display = "none";
+  document.getElementById("tooltip").style.display = "none";
+}
+
+/* ---------- sizing ---------- */
+let sizeRaf = 0;
+function reportSize() {
+  cancelAnimationFrame(sizeRaf);
+  sizeRaf = requestAnimationFrame(() => {
+    notify("ui/notifications/size-changed", {
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+    });
+  });
+}
+new ResizeObserver(() => { if (places.length) render(); else reportSize(); })
+  .observe(document.getElementById("root"));
+document.getElementById("tableWrap").addEventListener("toggle", reportSize);
+</script>
+</body>
+</html>

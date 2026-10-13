@@ -1,5 +1,5 @@
 name = "get_drive_details"
-description = "Full statistics for one specific drive by its drive_id (find ids with search_drives): timestamps, distance km, duration, average/max speed, power extremes, inside/outside temperature °C, odometer start/end, rated range used km, range-based consumption %, and start/end locations."
+description = "Full statistics for one specific drive by its drive_id (find ids with search_drives): timestamps, distance km, duration, average/max speed, power extremes, inside/outside temperature °C, ascent and descent m, odometer start/end, rated range used km, range-based consumption %, and start/end locations."
 
 [[params]]
 name = "drive_id"
@@ -94,3 +94,12 @@ type = "string"
 [[output]]
 name = "end_city"
 type = "string"
+
+[[output]]
+name = "ascent_m"
+type = "integer"
+description = "Total climb in meters (GPS elevation noise inflates it; ascent_m - descent_m is the reliable net climb)."
+
+[[output]]
+name = "descent_m"
+type = "integer"

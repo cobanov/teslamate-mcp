@@ -1,0 +1,119 @@
+name = "get_timeline"
+description = "What the car did, in order: drives, charging sessions, the time parked between them, and software updates, one row per activity, oldest first. Answers 'what did my car do yesterday / on Saturday / last week'. Each row has the activity (drive, charge, park, update), start and end (UTC and local time), duration, location (a drive's start, where it parked or charged; TeslaMate geofence names win over addresses), a drive's destination and distance, battery % at start and end, kWh added and cost for charges, the share of a park spent asleep or offline, a software update's version, and the drive_id or charging_process_id for follow-up tools. A park with no end_date is still going on. Defaults to the last 7 local days; when a window holds more rows than limit, the newest rows are kept."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "start_date"
+type = "string"
+description = "First local calendar day to show, ISO format (YYYY-MM-DD). Defaults to 6 days before end_date."
+
+[[params]]
+name = "end_date"
+type = "string"
+description = "Last local calendar day to show, ISO format (YYYY-MM-DD). Defaults to today. For a single day, pass the same date as start_date and end_date."
+
+[[params]]
+name = "min_park_minutes"
+type = "integer"
+description = "Leave out parks shorter than this many minutes."
+default = 5
+minimum = 0
+maximum = 1440
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned (the newest ones in the window)."
+default = 100
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "activity"
+type = "string"
+description = "drive, charge, park, or update."
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "UTC."
+
+[[output]]
+name = "end_date"
+type = "string"
+description = "UTC; null while the activity is still going on."
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Start in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "end_local"
+type = "string"
+description = "End in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "duration_min"
+type = "number"
+
+[[output]]
+name = "location"
+type = "string"
+description = "A drive's start; where the car parked or charged."
+
+[[output]]
+name = "destination"
+type = "string"
+description = "Where a drive ended."
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "battery_start"
+type = "integer"
+description = "Battery level (%) at the start."
+
+[[output]]
+name = "battery_end"
+type = "integer"
+description = "Battery level (%) at the end."
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "cost"
+type = "number"
+description = "Charging cost as stored in TeslaMate (null when unknown)."
+
+[[output]]
+name = "pct_asleep_or_offline"
+type = "number"
+description = "For parks: share of the time the car was asleep or offline."
+
+[[output]]
+name = "drive_id"
+type = "integer"
+description = "For drives: pass to get_drive_details or show_drive_route."
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+description = "For charges: pass to get_charging_curve or show_charging_curve."
+
+[[output]]
+name = "version"
+type = "string"
+description = "For updates: the software version installed."

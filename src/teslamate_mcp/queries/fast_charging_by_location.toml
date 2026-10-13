@@ -1,0 +1,108 @@
+name = "get_fast_charging_by_location"
+description = "DC fast-charging per location and charger type (supercharger or other_dc): how often you charged there, average and best peak power kW, average power over the session and across 20-80% (the fairest speed comparison), average minutes from 20% to 80%, kWh added, average price per kWh over sessions with a cost, sessions where the battery heater ran, and the last visit. Answers 'which fast chargers are fastest (or cheapest) for my car?'. Most-used first by default. Sessions that added under 1 kWh are skipped."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the session's address, city, and geofence name."
+
+[[params]]
+name = "charger_type"
+type = "string"
+description = "dc for every fast charger, supercharger for Tesla Superchargers only, other_dc for third-party fast chargers only."
+default = "dc"
+enum = ["dc", "supercharger", "other_dc"]
+
+[[params]]
+name = "min_sessions"
+type = "integer"
+description = "Only locations with at least this many sessions."
+default = 1
+minimum = 1
+maximum = 1000
+
+[[params]]
+name = "order_by"
+type = "string"
+description = "Most sessions first (sessions), highest average power across 20-80% first (avg_power_20_80), or highest average peak power first (peak_power)."
+default = "sessions"
+enum = ["sessions", "avg_power_20_80", "peak_power"]
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of locations returned."
+default = 20
+minimum = 1
+maximum = 200
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "charger_type"
+type = "string"
+description = "supercharger or other_dc."
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "avg_peak_power_kw"
+type = "number"
+
+[[output]]
+name = "best_peak_power_kw"
+type = "integer"
+
+[[output]]
+name = "avg_power_kw"
+type = "number"
+description = "Average of kWh added / session duration."
+
+[[output]]
+name = "avg_power_20_80_kw"
+type = "number"
+description = "Average charging power while the battery was between 20% and 80%."
+
+[[output]]
+name = "avg_minutes_20_to_80"
+type = "number"
+description = "Over sessions that spanned 20% to 80%."
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "avg_cost_per_kwh"
+type = "number"
+description = "Total cost / kWh of the sessions that have a cost."
+
+[[output]]
+name = "sessions_with_battery_heating"
+type = "integer"
+
+[[output]]
+name = "last_visit"
+type = "string"
+description = "Start of the latest session there (UTC)."

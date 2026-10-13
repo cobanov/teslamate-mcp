@@ -6,6 +6,7 @@ WITH route AS (
         p.speed,
         p.power,
         p.odometer,
+        p.elevation,
         NTILE(%(max_points)s::int) OVER (ORDER BY p.date) AS bucket
     FROM drives d
         JOIN positions p ON p.car_id = d.car_id
@@ -21,7 +22,8 @@ SELECT bucket AS point_order,
     MIN(battery_level) AS battery_level,
     MAX(speed) AS speed_max_kmh,
     ROUND(AVG(power)::numeric, 1) AS avg_power_kw,
-    MAX(odometer) AS odometer_km
+    MAX(odometer) AS odometer_km,
+    ROUND(AVG(elevation))::int AS elevation_m
 FROM route
 GROUP BY bucket
 ORDER BY point_order;

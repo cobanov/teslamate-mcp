@@ -1,0 +1,101 @@
+name = "get_trip_details"
+description = "The timeline of one trip from get_trips: its drives (legs) and the stops between them in order, one row each. Drive rows carry drive_id (usable with get_drive_details / show_drive_route), times, distance, from/to place, max speed, and rated range used. Stop rows are kind 'stop' or 'charging_stop' with where and how long the car stood, and for charging stops the kWh added and battery % before and after. Use the same max_stop_minutes / max_charging_stop_minutes as the get_trips call the trip came from."
+
+[[params]]
+name = "trip_id"
+type = "integer"
+description = "The trip_id from get_trips. Any drive id within the trip also works."
+required = true
+
+[[params]]
+name = "max_stop_minutes"
+type = "integer"
+description = "Longest stop without charging (WC, food) that still counts as the same trip, in minutes. A longer stop starts a new trip."
+default = 30
+minimum = 1
+maximum = 1440
+
+[[params]]
+name = "max_charging_stop_minutes"
+type = "integer"
+description = "Longest stop with a charging session in it that still counts as the same trip, in minutes (covers a fast charge plus a meal). Overnight and home charging normally exceed it and end the trip."
+default = 120
+minimum = 1
+maximum = 1440
+
+[[output]]
+name = "seq"
+type = "integer"
+description = "1-based position in the timeline."
+
+[[output]]
+name = "trip_id"
+type = "integer"
+
+[[output]]
+name = "kind"
+type = "string"
+description = "'drive', 'stop', or 'charging_stop'."
+
+[[output]]
+name = "leg"
+type = "integer"
+description = "Drive number within the trip; a stop carries the number of the drive before it."
+
+[[output]]
+name = "drive_id"
+type = "integer"
+description = "Set on drive rows only."
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "duration_min"
+type = "number"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "from_location"
+type = "string"
+description = "Drive start, or where the car stood for a stop (the charger's address for charging stops)."
+
+[[output]]
+name = "from_city"
+type = "string"
+
+[[output]]
+name = "to_location"
+type = "string"
+
+[[output]]
+name = "to_city"
+type = "string"
+
+[[output]]
+name = "speed_max_kmh"
+type = "integer"
+
+[[output]]
+name = "rated_range_used_km"
+type = "number"
+
+[[output]]
+name = "charge_energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "charge_start_battery_level"
+type = "integer"
+
+[[output]]
+name = "charge_end_battery_level"
+type = "integer"

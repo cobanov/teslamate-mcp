@@ -1,0 +1,67 @@
+name = "get_visited_places"
+description = "Where the car parks: one row per place it arrived at (a drive ending there), with the place's coordinates, the number of arrivals, hours parked there (until the car's next drive; the current stay counts up to now), charging sessions and kWh added there, and the last arrival. Geofence names win over addresses; one place can show up as several nearby addresses (reverse geocoding varies by a few meters), which a TeslaMate geofence merges. Most-visited first. Prefer show_visited_places when the user wants to see the places on a map."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Only arrivals and charges in the last N days. Omit for the whole history."
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_arrivals"
+type = "integer"
+description = "Only places the car arrived at least this many times."
+default = 1
+minimum = 1
+maximum = 10000
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of places returned."
+default = 50
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "city"
+type = "string"
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "arrivals"
+type = "integer"
+
+[[output]]
+name = "parked_hours"
+type = "number"
+
+[[output]]
+name = "charging_sessions"
+type = "integer"
+
+[[output]]
+name = "kwh_added"
+type = "number"
+
+[[output]]
+name = "last_arrival"
+type = "string"
+description = "UTC."

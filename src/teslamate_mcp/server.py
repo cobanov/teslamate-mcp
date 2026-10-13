@@ -15,6 +15,7 @@ from psycopg_pool import AsyncConnectionPool
 from . import __version__
 from .config import Settings
 from .db import build_pool
+from .instructions import build_instructions
 from .prompts import register_prompts
 from .resources import register_resources
 from .schema import load_schema
@@ -96,13 +97,20 @@ def create_server(settings: Settings) -> MCPServer:
     mcp = MCPServer(
         "teslamate",
         version=__version__,
+        instructions=build_instructions(settings),
         lifespan=lifespan,
         debug=settings.debug,
         cache_hints=_CACHE_HINTS,
         # MCP Apps (io.modelcontextprotocol/ui): one show_* tool + ui://
         # resource per APP_SPECS entry. Each degrades to a plain data tool
         # on clients that did not negotiate the extension.
-        extensions=[build_apps_extension(tools, report_timezone=settings.report_timezone)],
+        extensions=[
+            build_apps_extension(
+                tools,
+                report_timezone=settings.report_timezone,
+                map_tiles=settings.map_tiles,
+            )
+        ],
     )
 
     register_predefined_tools(mcp, tools, report_timezone=settings.report_timezone)

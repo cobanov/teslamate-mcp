@@ -48,3 +48,8 @@ type = "number"
 [[output]]
 name = "odometer_km"
 type = "number"
+
+[[output]]
+name = "elevation_m"
+type = "integer"
+description = "Average elevation of the bucket's samples, in meters."

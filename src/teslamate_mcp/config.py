@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +30,17 @@ class Settings(BaseSettings):
         default=None,
         description="Bearer token for HTTP transport. Auth is disabled when empty.",
     )
+    cf_access_team_domain: str | None = Field(
+        default=None,
+        description=(
+            "Cloudflare Access team domain (e.g. myteam.cloudflareaccess.com). With "
+            "CF_ACCESS_AUD, accepts requests carrying a verified Cf-Access-Jwt-Assertion."
+        ),
+    )
+    cf_access_aud: str | None = Field(
+        default=None,
+        description="Application Audience (AUD) tag of the Cloudflare Access application.",
+    )
 
     host: str = Field(default="0.0.0.0", description="HTTP bind host.")
     port: int = Field(default=8888, description="HTTP bind port.", ge=1, le=65535)
@@ -53,7 +64,7 @@ class Settings(BaseSettings):
     custom_sql_row_limit: int = Field(
         default=1000,
         ge=1,
-        description="Default LIMIT injected into custom SQL queries when absent.",
+        description="Maximum number of rows run_sql returns, whatever LIMIT the query has.",
     )
 
     enable_charging_writes: bool = Field(
@@ -61,6 +72,15 @@ class Settings(BaseSettings):
         description=(
             "Register the set_charging_cost write tool. Requires the DB role to "
             "hold UPDATE (cost) ON charging_processes. Off by default."
+        ),
+    )
+
+    map_tiles: bool = Field(
+        default=True,
+        description=(
+            "Draw a basemap (Esri gray canvas tiles) under the route, trip, and places maps. "
+            "Fetching tiles reveals the rough area being viewed to Esri; set "
+            "false to keep the chart fully self-contained."
         ),
     )
 
@@ -81,6 +101,13 @@ class Settings(BaseSettings):
         except ZoneInfoNotFoundError as exc:
             raise ValueError(f"Unknown IANA timezone: {value!r}") from exc
         return value
+
+    @model_validator(mode="after")
+    def _check_cf_access_pair(self) -> Settings:
+        # One without the other would silently leave Access auth off.
+        if bool(self.cf_access_team_domain) != bool(self.cf_access_aud):
+            raise ValueError("Set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD together, or neither")
+        return self
 
 
 def load_settings() -> Settings:

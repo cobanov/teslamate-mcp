@@ -27,13 +27,34 @@ async def test_fetch_readonly_returns_jsonable_rows(pool) -> None:
 
 
 async def test_fetch_readonly_rejects_writes(pool) -> None:
-    """A real READ ONLY transaction rejects INSERT at the PG layer."""
+    """A real READ ONLY transaction rejects a SELECT that writes at the PG layer."""
     with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+        await fetch_readonly(
+            pool,
+            "SELECT nextval('demo_cars_id_seq')",
+            statement_timeout_ms=2000,
+        )
+
+
+async def test_fetch_readonly_refuses_non_queries(pool) -> None:
+    """The server-side cursor can only be declared for a query."""
+    with pytest.raises(psycopg.errors.SyntaxError):
         await fetch_readonly(
             pool,
             "INSERT INTO demo_cars (name) VALUES ('Cybertruck')",
             statement_timeout_ms=2000,
         )
+
+
+async def test_fetch_readonly_caps_rows_whatever_the_limit(pool) -> None:
+    """Regression: a query's own (or a nested) LIMIT used to switch the cap off."""
+    nested = "SELECT n FROM (SELECT n FROM generate_series(1, 5000) AS n LIMIT 4000) AS s;"
+    rows = await fetch_readonly(pool, nested, statement_timeout_ms=2000, max_rows=100)
+    assert [r["n"] for r in rows] == list(range(1, 101))
+    small = await fetch_readonly(
+        pool, "SELECT n FROM generate_series(1, 5) AS n", statement_timeout_ms=2000, max_rows=100
+    )
+    assert len(small) == 5
 
 
 async def test_fetch_readonly_enforces_statement_timeout(pool) -> None:

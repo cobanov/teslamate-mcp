@@ -3,11 +3,14 @@ WITH sessions AS (
         cp.car_id,
         cp.charge_energy_added,
         cp.charge_energy_used,
+        -- DC: a sample came from a fast charger, or had no AC phases while
+        -- power flowed. AC sessions often end on a 0 kW sample with no phases,
+        -- which used to make them count as DC.
         CASE WHEN EXISTS (
             SELECT 1
             FROM charges ch
             WHERE ch.charging_process_id = cp.id
-                AND ch.charger_phases IS NULL
+                AND (ch.fast_charger_present OR (ch.charger_phases IS NULL AND ch.charger_power > 0))
         ) THEN 'DC' ELSE 'AC' END AS charge_type
     FROM charging_processes cp
     WHERE cp.charge_energy_used > 0

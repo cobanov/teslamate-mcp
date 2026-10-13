@@ -1,0 +1,73 @@
+name = "get_activity_report"
+description = "A month by day or a year by month: per local day (period=month) or month (period=year), the drives, distance, driving hours, energy used and consumption (Wh/km), charging sessions, kWh added, recorded charging cost, and average outside temperature. Empty days or months are included as zeros, so the rows cover the whole period. Defaults to the current month; pass year and month for another. Prefer show_activity_report when the user wants to see a monthly or yearly overview."
+
+[[params]]
+name = "period"
+type = "string"
+description = "month: one row per day of the month. year: one row per month of the year."
+default = "month"
+enum = ["month", "year"]
+
+[[params]]
+name = "year"
+type = "integer"
+description = "Calendar year. Defaults to the current year."
+minimum = 2000
+maximum = 2100
+
+[[params]]
+name = "month"
+type = "integer"
+description = "Calendar month 1-12, for period=month. Defaults to the current month."
+minimum = 1
+maximum = 12
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars combined."
+
+[[output]]
+name = "bucket"
+type = "string"
+description = "Local day (YYYY-MM-DD) or month (YYYY-MM)."
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "driving_hours"
+type = "number"
+
+[[output]]
+name = "energy_used_kwh"
+type = "number"
+description = "Rated range used x the car's efficiency."
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Consumption; null on days without driving."
+
+[[output]]
+name = "charging_sessions"
+type = "integer"
+
+[[output]]
+name = "kwh_added"
+type = "number"
+
+[[output]]
+name = "charging_cost"
+type = "number"
+description = "Sum of recorded costs; null when no session in the bucket has one."
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+description = "Driving-time-weighted outside temperature, °C."

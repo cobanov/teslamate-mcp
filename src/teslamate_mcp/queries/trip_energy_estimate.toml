@@ -1,0 +1,128 @@
+name = "get_trip_energy_estimate"
+description = "Will I make it? Estimates the energy and battery a drive of a given distance will take, from this car's own driving history rather than the EPA/WLTP figure. Consumption comes from past drives at a similar outside temperature (within 3°C, widening to 6°C, 10°C, then all temperatures until there are at least 5 drives and 50 km to go on); highway=true uses only long drives averaging 70 km/h or more, which fits motorway trips. Returns, per car: the expected and a conservative (90th percentile) Wh/km, energy needed in kWh, usable battery capacity and full-battery range, the starting battery % (the latest recorded one unless start_soc is given, with its timestamp), battery % needed, and battery % on arrival. A negative arrival % means a charging stop is needed. Get the distance from a maps or routing tool when the user names a destination; elevation and wind are not modeled, so keep a margin on mountain routes."
+
+[[params]]
+name = "distance_km"
+type = "number"
+description = "Length of the planned drive in kilometers."
+required = true
+minimum = 1
+maximum = 5000
+
+[[params]]
+name = "outside_temp_c"
+type = "number"
+description = "Expected outside temperature in °C during the drive. Omit to use drives at all temperatures."
+minimum = -40
+maximum = 55
+
+[[params]]
+name = "start_soc"
+type = "integer"
+description = "Battery % at departure. Omit to use the latest recorded battery level."
+minimum = 1
+maximum = 100
+
+[[params]]
+name = "highway"
+type = "boolean"
+description = "Base the estimate on long drives averaging at least 70 km/h (motorway driving)."
+default = false
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days of driving history to learn from."
+default = 730
+minimum = 30
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "outside_temp_c"
+type = "number"
+
+[[output]]
+name = "based_on"
+type = "string"
+description = "Which past drives the consumption came from, by temperature."
+
+[[output]]
+name = "highway"
+type = "boolean"
+
+[[output]]
+name = "drives_used"
+type = "integer"
+
+[[output]]
+name = "km_used"
+type = "number"
+description = "Total distance of the drives the estimate is based on."
+
+[[output]]
+name = "wh_per_km_expected"
+type = "number"
+description = "Distance-weighted average consumption of those drives."
+
+[[output]]
+name = "wh_per_km_conservative"
+type = "number"
+description = "90th percentile consumption of those drives."
+
+[[output]]
+name = "energy_needed_kwh"
+type = "number"
+
+[[output]]
+name = "energy_needed_kwh_conservative"
+type = "number"
+
+[[output]]
+name = "usable_capacity_kwh"
+type = "number"
+description = "Usable energy of a full battery on the rated-range scale, from recent charges."
+
+[[output]]
+name = "full_battery_range_km"
+type = "number"
+description = "Range from 100% to 0% at the expected consumption."
+
+[[output]]
+name = "start_soc"
+type = "integer"
+description = "Battery % at departure."
+
+[[output]]
+name = "start_soc_as_of"
+type = "string"
+description = "When the latest battery level was recorded (UTC); null when start_soc was given."
+
+[[output]]
+name = "soc_needed_pct"
+type = "number"
+
+[[output]]
+name = "soc_needed_pct_conservative"
+type = "number"
+
+[[output]]
+name = "arrival_soc_pct"
+type = "number"
+description = "Expected battery % on arrival; negative means a charging stop is needed."
+
+[[output]]
+name = "arrival_soc_pct_conservative"
+type = "number"

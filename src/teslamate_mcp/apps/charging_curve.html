@@ -151,20 +151,34 @@ window.addEventListener("message", (event) => {
     post({ jsonrpc: "2.0", id: msg.id, result: {} });
     return;
   }
+  if (msg.method === "ping" && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, result: {} });
+    return;
+  }
+  // Answer any other host request so it fails fast instead of timing out.
+  if (msg.method && msg.id !== undefined) {
+    post({ jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found" } });
+  }
 });
 
+// Params per McpUiInitializeRequest (ext-apps 2026-01-26): appInfo,
+// appCapabilities and protocolVersion are all required. Hosts validate them
+// and send tool-input/tool-result only after `initialized`, so a rejected
+// handshake leaves the view empty.
 request("ui/initialize", {
   protocolVersion: "2026-01-26",
-  capabilities: {},
-  clientInfo: { name: "teslamate-charging-curve", version: "1.0.0" },
-  appCapabilities: { availableDisplayModes: ["inline"] },
+  appInfo: { name: "teslamate-charging-curve", version: "1.1.0" },
+  appCapabilities: {},
 }).then((res) => {
   const hc = (res && res.hostContext) || {};
   if (hc.theme) applyTheme(hc.theme);
   if (hc.timeZone) hostTimeZone = hc.timeZone;
   notify("ui/notifications/initialized");
   render();
-}).catch(() => { /* keep default theme; data may still arrive */ });
+}).catch((err) => {
+  console.error("[teslamate] ui/initialize rejected by host:", err);
+  showState("The chart could not connect to the host.");
+});
 
 /* ---------- data handling ---------- */
 let rows = [];
@@ -178,14 +192,31 @@ function onToolInput(args) {
   }
 }
 
+/* Rows come from structuredContent.result; hosts that pass the result through
+   without it still get the same rows as text blocks (one JSON object per row,
+   or one JSON array), so parse those as a fallback. */
+function extractRows(result) {
+  const sc = result.structuredContent;
+  if (sc && Array.isArray(sc.result)) return sc.result;
+  const out = [];
+  for (const block of result.content || []) {
+    if (!block || block.type !== "text" || typeof block.text !== "string") continue;
+    try {
+      const v = JSON.parse(block.text);
+      if (Array.isArray(v)) out.push(...v.filter((r) => r && typeof r === "object"));
+      else if (v && typeof v === "object") out.push(v);
+    } catch (_) { /* not JSON: ignore */ }
+  }
+  return out;
+}
+
 function onToolResult(result) {
   if (result.isError) {
     const text = (result.content || []).map((c) => c.text || "").join(" ");
     showState("Could not load the charging curve. " + text);
     return;
   }
-  const sc = result.structuredContent;
-  rows = (sc && Array.isArray(sc.result)) ? sc.result : [];
+  rows = extractRows(result);
   if (!rows.length) {
     showState("No charge points recorded for this session.");
     return;

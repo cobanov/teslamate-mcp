@@ -145,5 +145,8 @@ def register_charging_write_tools(mcp: MCPServer) -> None:
             "4. For each confirmed match, call `set_charging_cost` with the session's "
             "`charging_process_id` and the receipt amount.\n"
             "5. When all receipts are processed, call `get_charging_costs` with "
-            "group_by='month' and present a short summary of what was updated."
+            "group_by='month' and present a short summary of what was updated.\n"
+            "6. If sessions still have no cost, offer estimates from "
+            "`get_charging_cost_estimates`, and write them with `set_charging_cost` "
+            "only for the sessions the user approves."
         )

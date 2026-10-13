@@ -19,7 +19,7 @@ uv run teslamate-mcp stdio              # run the stdio server
 uv run teslamate-mcp http               # run the HTTP server
 uv run ruff check src tests             # lint
 uv run ruff format src tests            # format
-uv run pytest                           # full test suite (Docker-backed integration tests skip if Docker is absent)
+uv run pytest                           # full test suite (database tests skip without Docker or TESLAMATE_TEST_DATABASE_URL)
 ```
 
 CI runs the same `ruff check`, `ruff format --check`, and `pytest` commands on every push and pull request, so running them locally before pushing means fewer back-and-forth round trips.

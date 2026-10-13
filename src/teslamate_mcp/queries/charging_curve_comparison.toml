@@ -1,0 +1,77 @@
+name = "get_charging_curve_comparison"
+description = "Charging curves of several sessions against battery level, to compare them: one row per session and battery % with the average and maximum charging power at that level. Pass charging_process_ids (from get_fast_charging_sessions or search_charging_sessions) to compare specific sessions, or leave it out to take the latest sessions matching car, location, and charger type (DC by default). Plotting power against battery % rather than time is what makes sessions comparable: it shows whether a slow session was the charger or a cold or full battery. Prefer show_charging_curve_comparison when the user wants to see the curves."
+
+[[params]]
+name = "charging_process_ids"
+type = "string"
+description = "Comma-separated charging session ids to compare, e.g. '212,216'. Filters are ignored when given."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the session's address, city, and geofence name."
+
+[[params]]
+name = "charger_type"
+type = "string"
+description = "Which sessions to pick when no ids are given: dc (every fast charger), supercharger, other_dc, ac, or any."
+default = "dc"
+enum = ["dc", "supercharger", "other_dc", "ac", "any"]
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of sessions compared."
+default = 5
+minimum = 1
+maximum = 10
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "Session start (UTC)."
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Session start in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "charger_type"
+type = "string"
+description = "supercharger, other_dc, or ac."
+
+[[output]]
+name = "battery_level"
+type = "integer"
+description = "Battery %."
+
+[[output]]
+name = "power_kw"
+type = "number"
+description = "Average charging power while at this battery %."
+
+[[output]]
+name = "max_power_kw"
+type = "integer"
+
+[[output]]
+name = "outside_temp"
+type = "number"

@@ -27,6 +27,11 @@ _EXPECTED_PROMPTS = {
     "find_anomalies",
     "weather_efficiency",
     "status_report",
+    "diagnose_sleep",
+    "plan_trip",
+    "review_trip",
+    "monthly_recap",
+    "charging_costs_and_savings",
 }
 
 
@@ -55,7 +60,8 @@ async def test_every_prompt_tool_reference_resolves() -> None:
     tool_names = {t.name for t in await mcp.list_tools()}
 
     for prompt in await mcp.list_prompts():
-        result = await mcp.get_prompt(prompt.name)
+        required = {a.name: "x" for a in prompt.arguments or [] if a.required}
+        result = await mcp.get_prompt(prompt.name, required or None)
         text = result.model_dump_json()
         referenced = set(_TOOL_REF_RE.findall(text))
         assert referenced, f"prompt {prompt.name} references no tools"
@@ -69,3 +75,23 @@ async def test_summarize_driving_window_argument_binds() -> None:
     mcp = create_server(settings)
     result = await mcp.get_prompt("summarize_driving", {"window": "last 7 days"})
     assert "last 7 days" in result.model_dump_json()
+
+
+@pytest.mark.asyncio
+async def test_status_report_does_not_ask_for_data_teslamate_lacks() -> None:
+    settings = Settings(database_url=_DUMMY_DB_URL)  # type: ignore[call-arg]
+    mcp = create_server(settings)
+    text = (await mcp.get_prompt("status_report")).model_dump_json()
+    assert "any pending update" not in text
+
+
+@pytest.mark.asyncio
+async def test_prompt_arguments_bind() -> None:
+    settings = Settings(database_url=_DUMMY_DB_URL)  # type: ignore[call-arg]
+    mcp = create_server(settings)
+    trip = await mcp.get_prompt("plan_trip", {"destination": "Ankara", "outside_temp_c": "4"})
+    assert "Ankara" in trip.model_dump_json() and "4 °C" in trip.model_dump_json()
+    savings = await mcp.get_prompt("charging_costs_and_savings", {"fuel_price_per_liter": "48.5"})
+    assert "48.5 per liter" in savings.model_dump_json()
+    sleep = await mcp.get_prompt("diagnose_sleep", {"days": "30"})
+    assert "days=30" in sleep.model_dump_json()

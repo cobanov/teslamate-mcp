@@ -1,0 +1,122 @@
+name = "get_fast_charging_sessions"
+description = "DC fast-charging sessions with the numbers that compare chargers and reveal a slow session: charger type (supercharger for Tesla, other_dc for third-party), connector, battery % start and end, kWh added, duration, peak power kW, average power over the session, average power across 20-80% (the fairest comparison between sessions), minutes from 20% to 80% when the session spanned that band, whether the battery heater ran (a cold battery charges slower), outside temperature, and cost. Newest first by default, or fastest first. Sessions that added under 1 kWh are skipped. For the full curve of one session use show_charging_curve; to overlay several, show_charging_curve_comparison."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the session's address, city, and geofence name."
+
+[[params]]
+name = "charger_type"
+type = "string"
+description = "dc for every fast charger, supercharger for Tesla Superchargers only, other_dc for third-party fast chargers only."
+default = "dc"
+enum = ["dc", "supercharger", "other_dc"]
+
+[[params]]
+name = "order_by"
+type = "string"
+description = "Newest first (start_date), highest peak power first (peak_power), or highest average power across 20-80% first (avg_power_20_80)."
+default = "start_date"
+enum = ["start_date", "peak_power", "avg_power_20_80"]
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of sessions returned."
+default = 20
+minimum = 1
+maximum = 200
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "UTC."
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Start in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "location"
+type = "string"
+
+[[output]]
+name = "charger_type"
+type = "string"
+description = "supercharger or other_dc."
+
+[[output]]
+name = "connector"
+type = "string"
+description = "Fast charger type reported by the car, e.g. Combo (CCS) or Tesla."
+
+[[output]]
+name = "start_soc"
+type = "integer"
+
+[[output]]
+name = "end_soc"
+type = "integer"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "peak_power_kw"
+type = "integer"
+
+[[output]]
+name = "avg_power_kw"
+type = "number"
+description = "kWh added / session duration."
+
+[[output]]
+name = "avg_power_20_80_kw"
+type = "number"
+description = "Average charging power while the battery was between 20% and 80%."
+
+[[output]]
+name = "minutes_20_to_80"
+type = "number"
+description = "Minutes from 20% to 80%; null when the session did not span that band."
+
+[[output]]
+name = "battery_heater_on"
+type = "boolean"
+description = "The battery heater ran during the session (cold battery)."
+
+[[output]]
+name = "outside_temp_avg"
+type = "number"
+
+[[output]]
+name = "cost"
+type = "number"

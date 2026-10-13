@@ -4,6 +4,219 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-09-30
+
+### Added
+- **Sleep and wake analysis** from TeslaMate's `states` table, which no tool
+  read before.
+  - `get_state_history`: per car and local day, hours online, asleep and
+    offline, driving and charging hours, idle awake hours (online while parked
+    and not charging, the time that drains the battery), wake-ups, and the
+    share of the day asleep or offline. Intervals are split at local midnight.
+  - `get_idle_awake_periods`: the online periods that kept the car awake while
+    parked, longest idle time first, with where the car was parked.
+  - `get_current_car_status` now reports `car_state` (driving, charging,
+    online, asleep, or offline) and `car_state_since`.
+  An online state that TeslaMate never closed (it loses contact with a car
+  whose API token was revoked or that was sold) ends at the car's last logged
+  position instead of running to now, and drives TeslaMate left open after a
+  restart count neither as driving time nor as "driving now".
+- **`get_timeline`**: what the car did, in order — drives, charging sessions,
+  the time parked between them (with the share spent asleep or offline), and
+  software updates — with local times, places (geofence names first), battery
+  % at each end, kWh and cost. Defaults to the last 7 local days; a date range
+  shows any day. Parks are the gaps between activities, worked out over the
+  car's whole history, so a range never cuts a park short.
+- **`get_trip_energy_estimate`** ("will I make it?"): energy and battery % a
+  drive of a given distance will take, learned from the car's own drives at a
+  similar outside temperature (within 3°C, widening until there is enough
+  history), optionally motorway drives only. Returns expected and
+  conservative (90th percentile) consumption, usable capacity, full-battery
+  range, and the arrival battery % from the latest recorded level or a given
+  one. Consumption and capacity both come from the rated-range scale, so they
+  stay consistent with each other.
+- **`get_charging_cost_estimates`**: an estimated cost for every charging
+  session with none recorded, from the first basis that applies: free
+  Supercharging, a `price_per_kwh` argument, the session's geofence tariff,
+  the median price paid at the same address (nearest sessions in time), or
+  the median price for the same charger type (Supercharger, other DC, AC).
+  Pairs with `set_charging_cost` to backfill.
+- **`get_fuel_savings`**: the fuel the same distance would have taken and
+  cost, against what charging cost, with a coverage figure when some sessions
+  have no cost (or an `electricity_price_per_kwh` to price them).
+- `get_charging_costs` and `get_charging_by_geofence` report
+  `sessions_without_cost`.
+- **Fast-charging analytics** from the charges' fast-charger fields, which no
+  tool read before.
+  - `get_fast_charging_sessions`: DC sessions with charger type (Supercharger
+    or third-party), connector, peak and average power, average power across
+    20–80%, minutes from 20% to 80%, whether the battery heater ran, and cost.
+  - `get_fast_charging_by_location`: the same per location and charger type,
+    with the price paid per kWh.
+  - `get_charging_curve_comparison` and the `show_charging_curve_comparison`
+    MCP App: several sessions' power against battery %, overlaid, so a slow
+    session can be told apart from a cold or full battery.
+- **Elevation**, which TeslaMate records but no tool read.
+  - `get_efficiency_by_elevation`: consumption by net climb per km (downhill
+    to uphill), per car, against the car's flat drives. Net climb (ascent
+    minus descent) because GPS noise inflates ascent and descent alike.
+  - `get_drive_details` and `get_trips` report `ascent_m` and `descent_m`;
+    `get_drive_route` and `get_trip_route` report `elevation_m` per point.
+  - `show_drive_route` and `show_trip_route` draw an elevation profile under
+    the map, linked to it on hover.
+- **Three more charts**, each the MCP App of a new report:
+  - `show_activity_report` / `get_activity_report`: a month by day or a year
+    by month (distance, drives, consumption, kWh charged, cost, temperature),
+    with totals and empty days kept.
+  - `show_visited_places` / `get_visited_places`: a map of where the car
+    parks, sized by arrivals, with hours parked and charging per place.
+  - `show_efficiency_vs_temperature` / `get_drive_efficiency_points`: every
+    drive's consumption against outside temperature, sized by distance, with
+    the distance-weighted 5 °C average and the cold-weather penalty.
+
+- **`get_unit_preferences`**: the units chosen in TeslaMate's settings
+  (length, temperature, pressure, rated or ideal range), with the conversion
+  factors in its description, so the assistant answers in miles, °F, or psi
+  where the user asked TeslaMate for them. Tools keep returning metric values
+  and rated range; the charts stay metric.
+
+- **Server instructions.** The server now sends MCP `instructions`: units
+  and rated range, UTC timestamps against the configured `REPORT_TIMEZONE`,
+  unknown costs, and a short map from kind of question to tool (trips vs
+  drives, sleep, range planning, charging, costs, overviews, charts vs their
+  data twins). `set_charging_cost` is mentioned only when writes are enabled;
+  a test keeps every tool it names registered.
+
+- **Five new prompts**: `diagnose_sleep`, `plan_trip` (destination and
+  temperature arguments), `review_trip`, `monthly_recap`, and
+  `charging_costs_and_savings`.
+
+### Changed
+- **Prompts use the newer tools.** `analyze_battery_health` starts from the
+  energy-based capacity trend and looks at charging habits, `analyze_charging`
+  fills in missing costs and compares fast chargers, `find_anomalies` checks
+  sleep and hills, `summarize_driving` reports journeys, and
+  `weather_efficiency` plots every drive. `status_report` no longer asks for
+  a pending software update, which TeslaMate does not record, and says when
+  TeslaMate has lost contact with the car. `backfill_costs_from_receipts`
+  offers estimates for sessions without a receipt.
+- The README, Unraid template, `env.example`, and CONTRIBUTING.md match the
+  current tools, prompts, and charts (the README still said 30 report tools
+  and 3 charts), `MAP_TILES` is described as covering every map, and the
+  package URLs point to this fork, with the upstream project listed.
+- `get_most_visited_locations` documents `total_time_spent_min` as what it
+  is, the driving time of drives starting or ending there, not time parked
+  (`get_visited_places` has that).
+
+### Fixed
+- **`run_sql`'s row cap could be bypassed** (a known limitation in
+  SECURITY.md): the query was wrapped in `LIMIT` only when it had no `LIMIT`
+  of its own, so `SELECT * FROM (SELECT … LIMIT 5000000) x` ran uncapped.
+  The query now runs through a server-side cursor and at most
+  `CUSTOM_SQL_ROW_LIMIT` rows are fetched, whatever it says; the rest never
+  leave PostgreSQL. The tool description states the cap.
+- **`get_charging_efficiency` counted many AC sessions as DC.** A session was
+  DC when any sample had no charger phases, but AC sessions often end on a
+  0 kW sample with no phases (39 of 218 sessions on a real database). DC now
+  needs a sample from a fast charger, or one with no phases while power
+  flowed; every tool that splits AC from DC uses that same test.
+- **Average cost per kWh was too low whenever some sessions had no cost.**
+  `get_charging_costs` and `get_charging_by_geofence` divided the recorded
+  costs by the energy of every session, so each session with no cost counted
+  as free charging. The average now covers only sessions that have a cost.
+
+## [0.13.0] - 2026-09-30
+
+### Added
+- **Trips.** TeslaMate ends a drive every time the car parks, so one journey
+  with a WC break and a charging stop is several drives. Three new tools
+  merge a car's consecutive drives while each stop in between stays short:
+  up to `max_stop_minutes` (default 30) without charging, or
+  `max_charging_stop_minutes` (default 120) when a charging session happened
+  during the stop.
+  - `get_trips`: one row per trip with legs, stops and charging stops,
+    distance, driving/stopped/total time, moving speed, battery % at start
+    and end, kWh added on the way, rated range used, and average outside
+    temperature. Filters: dates, car, distance, number of legs, and a place
+    the trip passed through (any leg's start or end, not only the endpoints).
+  - `get_trip_details`: one trip's timeline of drives and stops, with where
+    and how long each stop lasted and, for charging stops, kWh added and
+    battery % before and after.
+  - `get_trip_route` and the `show_trip_route` MCP App: the whole trip on the
+    basemap, with a marker at every stop and charging stops highlighted.
+  All three share one grouping block (a test keeps the copies identical), and
+  `trip_id` is the trip's first drive id; any drive id in the trip also works.
+  Unlike Grafana's Continuous Trips dashboard, which splits at every charge,
+  a charging stop on the way stays part of the trip.
+
+### Changed
+- Tests can run against an existing PostgreSQL via
+  `TESLAMATE_TEST_DATABASE_URL` instead of Docker (point it at a scratch
+  database; the seed drops and recreates its tables).
+
+## [0.12.0] - 2026-09-30
+
+### Added
+- **Basemap under the route map.** `show_drive_route` now draws the track over
+  a low-detail basemap: Esri's gray canvas base layer, light or dark to match
+  the client, with the required attribution. The route is projected in Web
+  Mercator so it lines up with the tiles, gets a halo for contrast, and the
+  scale bar accounts for latitude. The view declares the tile host in
+  `_meta.ui.csp.resourceDomains`; if tiles fail to load, the plain route still
+  draws.
+- `MAP_TILES` setting (default `true`). Tiles are fetched by the viewer's
+  browser, which tells Esri the rough area being viewed; `MAP_TILES=false`
+  keeps the view fully self-contained. The setting is part of the view's URI
+  fingerprint, so toggling it never reuses a host's cached copy.
+
+## [0.11.3] - 2026-09-30
+
+### Fixed
+- **Hosts could keep running a stale chart view after an upgrade.** View URIs
+  never changed between releases, and after upgrading to 0.11.2 claude.ai's
+  frame still ran a view without the fixed handshake. Views are now served at
+  `ui://teslamate/<content-hash>/<name>.html`, so any change to a view gets a
+  new URI while unchanged views stay cacheable.
+- **Charts showed "no data" when the host omitted `structuredContent`.** The
+  views now fall back to the rows in the result's text blocks.
+
+## [0.11.2] - 2026-09-30
+
+### Fixed
+- **MCP Apps charts opened but stayed empty.** The chart views sent
+  `clientInfo` in `ui/initialize`, but `McpUiInitializeRequest` (ext-apps
+  2026-01-26) requires `appInfo`, `appCapabilities` and `protocolVersion`, and
+  hosts validate it. The host rejected the handshake, the view swallowed the
+  error and never sent `ui/notifications/initialized`, and hosts deliver
+  `tool-input`/`tool-result` only after that notification. All three views now
+  send the spec's fields, answer the host's `ping`, reply `Method not found` to
+  other host requests instead of leaving them to time out, and show an error
+  state when the handshake is rejected.
+
+## [0.11.1] - 2026-09-30
+
+### Fixed
+- **MCP Apps charts could still fall back to plain rows.** App tools now carry
+  the deprecated flat `_meta["ui/resourceUri"]` key alongside
+  `_meta.ui.resourceUri`, matching the ext-apps reference SDK
+  (`registerAppTool`), which stamps both because hosts that predate the nested
+  form only read the flat one. The Python SDK's `Apps.tool()` writes only the
+  nested form.
+
+## [0.11.0] - 2026-09-30
+
+### Added
+- **Cloudflare Access authentication.** With `CF_ACCESS_TEAM_DOMAIN` and
+  `CF_ACCESS_AUD` set, the HTTP transport also accepts requests carrying a
+  verified `Cf-Access-Jwt-Assertion` (RS256 signature against the team's
+  published keys, issuer, audience, expiry; keys cached and refetched on
+  rotation). `AUTH_TOKEN` keeps working alongside it. This lets claude.ai
+  connect through an Access application with Managed OAuth directly, instead
+  of through the MCP Server Portal, which namespaces `ui://` resource URIs
+  (`teslamate-mcp_ui://...`) and so prevents the `show_*` charts from rendering.
+- `pyjwt[crypto]` is now a direct dependency (it was already installed
+  transitively through `mcp`).
+
 ## [0.10.1] - 2026-08-03
 
 ### Fixed
@@ -22,9 +235,10 @@ All notable changes to this project are documented in this file. The format foll
   `pg_ls_dir`, `pg_authid`. `SECURITY.md` now documents this explicitly, with
   the `CREATE ROLE` snippet and two other known limitations (the row cap is
   bypassable by a nested `LIMIT`; `/health` is unauthenticated by design).
-- The Unraid + Cloudflare walkthrough moved from `deploy/unraid/` to the
-  [wiki](https://github.com/cobanov/teslamate-mcp/wiki/Unraid-Deployment). The
-  Community Applications template stays in the repository.
+- Added `deploy/unraid/README.md`, a short index for the Community
+  Applications template and the
+  [Unraid + Cloudflare walkthrough](deploy/unraid/UNRAID_CLOUDFLARE_DEPLOYMENT.md),
+  which stays in this repository.
 
 ## [0.10.0] - 2026-08-02
 
@@ -55,12 +269,6 @@ All notable changes to this project are documented in this file. The format foll
 ### Added
 - `STATEMENT_TIMEOUT_MS` setting (default `30000`).
 - `/health` now reports a `database` field alongside `status` and `version`.
-
-### Changed
-- README rewritten and cut roughly in half; the reference material it used to
-  carry now lives in the [wiki](https://github.com/cobanov/teslamate-mcp/wiki)
-  (tool reference, configuration, deployment, writing queries, write tools,
-  development).
 
 ## [0.9.1] - 2026-08-01
 

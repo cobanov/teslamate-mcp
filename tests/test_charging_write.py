@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit, urlunsplit
+
 import psycopg
 import pytest
 from mcp.types import ElicitResult
@@ -146,8 +148,10 @@ async def test_column_scoped_grant_is_the_real_boundary(pool, database_url) -> N
         await conn.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO mcp_cost_writer")
         await conn.execute("GRANT UPDATE (cost) ON charging_processes TO mcp_cost_writer")
 
-    restricted_url = database_url.replace("test:test@", "mcp_cost_writer:pw@")
-    assert restricted_url != database_url, "unexpected testcontainer credentials"
+    parts = urlsplit(database_url)
+    restricted_url = urlunsplit(
+        parts._replace(netloc=f"mcp_cost_writer:pw@{parts.hostname}:{parts.port}")
+    )
     settings = Settings(database_url=restricted_url)  # type: ignore[call-arg]
     restricted = build_pool(settings)
     await restricted.open()

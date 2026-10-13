@@ -20,7 +20,13 @@ from teslamate_mcp.tools.registry import discover_predefined_tools
 # Seeded ids from conftest._SETUP_SQL (SERIAL columns reset on every reseed).
 _TZ_BOUNDARY_DRIVE_ID = 4  # 2026-01-15 22:30 UTC = 2026-01-16 01:30 Europe/Istanbul
 _CURVE_SESSION_ID = 1  # 30 charge points, battery 50..79
-_REQUIRED_ARG_SEEDS = {"drive_id": _TZ_BOUNDARY_DRIVE_ID, "charging_process_id": _CURVE_SESSION_ID}
+_REQUIRED_ARG_SEEDS = {
+    "drive_id": _TZ_BOUNDARY_DRIVE_ID,
+    "charging_process_id": _CURVE_SESSION_ID,
+    "trip_id": _TZ_BOUNDARY_DRIVE_ID,  # any drive id resolves to its trip
+    "distance_km": 100,
+    "fuel_price_per_liter": 2.0,
+}
 
 
 def rows_from(result) -> list[dict[str, Any]]:
@@ -141,6 +147,10 @@ async def test_charging_costs_group_by(mcp_session) -> None:
             await session.call_tool("get_charging_costs", {"group_by": "location"})
         )
         assert {r["group_key"] for r in by_location} == {"Home Street 1", "Supercharger Edirne"}
+        home = next(r for r in by_location if r["group_key"] == "Home Street 1")
+        # 12.50 over the 30 kWh that has a cost, not over all 50 kWh charged there.
+        assert (home["total_cost"], home["sessions_without_cost"]) == (12.5, 1)
+        assert home["avg_cost_per_kwh"] == 0.4167
 
 
 async def test_battery_capacity_trend(mcp_session) -> None:
@@ -205,7 +215,10 @@ async def test_charging_by_geofence_buckets(mcp_session) -> None:
         assert set(buckets) == {"Home", "Ungeofenced"}
         assert buckets["Home"]["sessions"] == 2
         assert buckets["Home"]["kwh_added"] == 50.0
-        assert buckets["Home"]["avg_cost_per_kwh"] == 0.25  # 12.50 / 50 kWh
+        # 12.50 / 30 kWh: Red Rocket's 20 kWh at Home has no cost, so it is
+        # unknown rather than free and stays out of the average.
+        assert buckets["Home"]["avg_cost_per_kwh"] == 0.417
+        assert buckets["Home"]["sessions_without_cost"] == 1
 
         blue_only = rows_from(
             await session.call_tool("get_charging_by_geofence", {"car_name": "blue"})
@@ -293,11 +306,11 @@ async def test_schema_tool_compact_and_detail(mcp_session) -> None:
     async with mcp_session() as session:
         compact = rows_from(await session.call_tool("get_database_schema", {}))
         cars_row = next(r for r in compact if r["table_name"] == "cars")
-        assert cars_row["column_count"] == 7
+        assert cars_row["column_count"] == 8
         assert all("column_name" not in r for r in compact)
 
         detail = rows_from(await session.call_tool("get_database_schema", {"table": "cars"}))
-        assert len(detail) == 7
+        assert len(detail) == 8
         assert all(r["table_name"] == "cars" and "data_type" in r for r in detail)
 
         unknown = await session.call_tool("get_database_schema", {"table": "not_a_table"})
@@ -323,3 +336,22 @@ async def test_schema_refresh_picks_up_live_ddl(mcp_session, seeded_database) ->
         finally:
             await conn.execute("DROP TABLE IF EXISTS post_boot_table")
             await conn.close()
+
+
+async def test_run_sql_row_cap_holds_against_its_own_limit(mcp_session) -> None:
+    async with mcp_session(custom_sql_row_limit=25) as session:
+        capped = rows_from(
+            await session.call_tool(
+                "run_sql", {"query": "SELECT n FROM generate_series(1, 500) AS n LIMIT 400"}
+            )
+        )
+        under = rows_from(
+            await session.call_tool("run_sql", {"query": "SELECT id FROM cars ORDER BY id;"})
+        )
+        rejected = await session.call_tool("run_sql", {"query": "DELETE FROM cars"})
+        tools = {t.name: t for t in (await session.list_tools()).tools}
+
+    assert len(capped) == 25
+    assert [r["id"] for r in under] == [1, 2]
+    assert rejected.is_error
+    assert "at most 25 rows" in tools["run_sql"].description

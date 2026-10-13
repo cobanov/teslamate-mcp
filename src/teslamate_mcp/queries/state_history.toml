@@ -1,0 +1,59 @@
+name = "get_state_history"
+description = "Sleep and wake analysis from TeslaMate's state log, one row per car and local day (newest first): hours online, asleep, and offline; how much of the online time was driving and charging; idle_awake_hours (online while parked and not charging, the time that drains the battery); wakeups (online periods that began that day); and the share of the day asleep or offline. Many cars report 'offline' rather than 'asleep' when sleeping, so read both as not awake. Use it to answer 'is my car sleeping properly?'; follow up with get_idle_awake_periods to see when and where it stayed awake, and get_vampire_drain for the range it cost."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many local days to report, counting today."
+default = 14
+minimum = 1
+maximum = 366
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "day"
+type = "string"
+description = "Local calendar day (REPORT_TIMEZONE)."
+
+[[output]]
+name = "online_hours"
+type = "number"
+
+[[output]]
+name = "asleep_hours"
+type = "number"
+
+[[output]]
+name = "offline_hours"
+type = "number"
+
+[[output]]
+name = "driving_hours"
+type = "number"
+
+[[output]]
+name = "charging_hours"
+type = "number"
+
+[[output]]
+name = "idle_awake_hours"
+type = "number"
+description = "Online hours minus driving and charging: awake while parked."
+
+[[output]]
+name = "wakeups"
+type = "integer"
+description = "Online periods that started on this day."
+
+[[output]]
+name = "pct_asleep_or_offline"
+type = "number"
+description = "Share of the recorded time asleep or offline, in percent."

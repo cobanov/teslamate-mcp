@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from . import __version__
-from .auth import BearerAuthMiddleware
+from .auth import BearerAuthMiddleware, CloudflareAccessVerifier
 from .config import load_settings
 from .server import app_context_for, create_server
 from .telemetry import configure_telemetry
@@ -160,14 +160,21 @@ def http(
     app.router.routes.append(Route("/health", _make_health(mcp), methods=["GET"]))
     app.add_middleware(NormalizeMcpPathMiddleware)
 
+    log = logging.getLogger(__name__)
     token = settings.auth_token.get_secret_value() if settings.auth_token else ""
-    if token:
-        app.add_middleware(BearerAuthMiddleware, auth_token=token)
-        logging.getLogger(__name__).info("Bearer token authentication enabled")
-    else:
-        logging.getLogger(__name__).warning(
-            "No AUTH_TOKEN set — the HTTP endpoint is unauthenticated"
+    access_verifier = None
+    if settings.cf_access_team_domain and settings.cf_access_aud:
+        access_verifier = CloudflareAccessVerifier(
+            team_domain=settings.cf_access_team_domain, audience=settings.cf_access_aud
         )
+    if token or access_verifier:
+        app.add_middleware(BearerAuthMiddleware, auth_token=token, access_verifier=access_verifier)
+        if token:
+            log.info("Bearer token authentication enabled")
+        if access_verifier:
+            log.info("Cloudflare Access authentication enabled (issuer %s)", access_verifier.issuer)
+    else:
+        log.warning("No AUTH_TOKEN or Cloudflare Access set — the HTTP endpoint is unauthenticated")
 
     uvicorn.run(app, host=settings.host, port=settings.port, log_level=settings.log_level.lower())
 

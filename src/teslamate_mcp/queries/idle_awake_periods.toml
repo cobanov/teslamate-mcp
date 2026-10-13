@@ -1,0 +1,81 @@
+name = "get_idle_awake_periods"
+description = "When and where the car stayed awake while parked: online periods from TeslaMate's state log, minus the time spent driving and charging inside them, longest idle time first. Each row has the period's start (UTC and local), end (null while still ongoing), online hours, idle awake hours, drives during it, whether it charged, and where the car was parked. Long idle periods usually come from Sentry Mode, cabin overheat protection, climate kept on, a third-party app polling the car, or a TeslaMate setting that stops it from sleeping. Pair with get_state_history for the daily view."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look for online periods (by period end)."
+default = 7
+minimum = 1
+maximum = 366
+
+[[params]]
+name = "min_idle_minutes"
+type = "integer"
+description = "Only periods with at least this many idle awake minutes."
+default = 30
+minimum = 1
+maximum = 10080
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 20
+minimum = 1
+maximum = 200
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "When the car came online (UTC)."
+
+[[output]]
+name = "end_date"
+type = "string"
+description = "When it went asleep or offline again (UTC); null while still online."
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Start in local time (REPORT_TIMEZONE), YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "ongoing"
+type = "boolean"
+description = "True when the car is still online now."
+
+[[output]]
+name = "online_hours"
+type = "number"
+
+[[output]]
+name = "idle_awake_hours"
+type = "number"
+description = "Online hours minus driving and charging: awake while parked."
+
+[[output]]
+name = "drives_during"
+type = "integer"
+
+[[output]]
+name = "charged_during"
+type = "boolean"
+
+[[output]]
+name = "location"
+type = "string"
+description = "Where the car was parked: the end address of its last drive before the period ended."
+
+[[output]]
+name = "city"
+type = "string"

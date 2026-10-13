@@ -1,0 +1,83 @@
+name = "get_trip_route"
+description = "The GPS track of a whole trip from get_trips as ordered, downsampled points across all its drives: leg number, drive_id, timestamp, latitude/longitude, battery level, max speed (km/h), odometer. Each point says what came before its leg (start, stop, or charging_stop) and how long that stop lasted. show_trip_route draws the same data as a map."
+
+[[params]]
+name = "trip_id"
+type = "integer"
+description = "The trip_id from get_trips. Any drive id within the trip also works."
+required = true
+
+[[params]]
+name = "max_points"
+type = "integer"
+description = "About how many route points (time buckets) to return in total; a bucket that spans a stop is split, so a trip can return a few more."
+default = 300
+minimum = 10
+maximum = 2000
+
+[[params]]
+name = "max_stop_minutes"
+type = "integer"
+description = "Longest stop without charging (WC, food) that still counts as the same trip, in minutes. A longer stop starts a new trip."
+default = 30
+minimum = 1
+maximum = 1440
+
+[[params]]
+name = "max_charging_stop_minutes"
+type = "integer"
+description = "Longest stop with a charging session in it that still counts as the same trip, in minutes (covers a fast charge plus a meal). Overnight and home charging normally exceed it and end the trip."
+default = 120
+minimum = 1
+maximum = 1440
+
+[[output]]
+name = "point_order"
+type = "integer"
+
+[[output]]
+name = "leg"
+type = "integer"
+
+[[output]]
+name = "drive_id"
+type = "integer"
+
+[[output]]
+name = "stop_before"
+type = "string"
+description = "'start' on leg 1, else 'stop' or 'charging_stop' for the stop that preceded the leg."
+
+[[output]]
+name = "stop_before_min"
+type = "number"
+description = "Minutes of the stop before this leg (null on leg 1)."
+
+[[output]]
+name = "ts"
+type = "string"
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "battery_level"
+type = "integer"
+
+[[output]]
+name = "speed_max_kmh"
+type = "integer"
+
+[[output]]
+name = "odometer_km"
+type = "number"
+
+[[output]]
+name = "elevation_m"
+type = "integer"
+description = "Average elevation of the bucket's samples, in meters."

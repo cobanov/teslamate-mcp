@@ -1,0 +1,27 @@
+name = "get_unit_preferences"
+description = "The units and range type the user chose in TeslaMate's settings: unit_of_length (km or mi), unit_of_temperature (C or F), unit_of_pressure (bar or psi), preferred_range (rated or ideal), and language. Every other tool returns metric values (km, km/h, °C, bar, m, Wh/km) and rated range regardless, so call this once per conversation and convert when presenting numbers: km x 0.621371 = mi, km/h x 0.621371 = mph, Wh/km x 1.609344 = Wh/mi, °C x 9/5 + 32 = °F, bar x 14.5038 = psi, m x 3.28084 = ft. When preferred_range is ideal, say that range figures are rated range. Charts drawn by show_* tools use metric units."
+
+[[output]]
+name = "unit_of_length"
+type = "string"
+description = "km or mi."
+
+[[output]]
+name = "unit_of_temperature"
+type = "string"
+description = "C or F."
+
+[[output]]
+name = "unit_of_pressure"
+type = "string"
+description = "bar or psi (tire pressure)."
+
+[[output]]
+name = "preferred_range"
+type = "string"
+description = "rated or ideal; the tools report rated range."
+
+[[output]]
+name = "language"
+type = "string"
+description = "TeslaMate UI language, e.g. en."
