@@ -90,6 +90,21 @@ def _configure_logging(level: str) -> None:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, prog_name="teslamate-mcp")
+def _configure_event_loop() -> None:
+    """Select the event loop the database driver can actually run on.
+
+    asyncio installs a ProactorEventLoop by default on Windows and psycopg's async
+    connection refuses to run on it, so the pool never connected there: every tool
+    call failed and /health reported the database as unreachable even with a healthy
+    server. The selector loop is the compatible one, and ``tests/conftest.py`` has
+    always forced this policy for the test suite -- but the server entry points,
+    which are what a Windows user actually runs, did not. A no-op off Windows, where
+    the default is already a selector loop.
+    """
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
 def main() -> None:
     """TeslaMate MCP server — query your Tesla data from any MCP-aware client."""
 
@@ -97,6 +112,7 @@ def main() -> None:
 @main.command()
 def stdio() -> None:
     """Run the MCP server over stdio (for local clients like Cursor or Claude Desktop)."""
+    _configure_event_loop()
     settings = load_settings()
     _configure_logging(settings.log_level)
     configure_telemetry()
@@ -133,6 +149,7 @@ def http(
     stateless: bool,
 ) -> None:
     """Run the MCP server over streamable HTTP (for remote deployments)."""
+    _configure_event_loop()
     settings = load_settings()
     if host is not None:
         settings.host = host
