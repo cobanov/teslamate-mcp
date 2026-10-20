@@ -88,8 +88,6 @@ def _configure_logging(level: str) -> None:
     )
 
 
-@click.group(context_settings={"help_option_names": ["-h", "--help"]})
-@click.version_option(__version__, prog_name="teslamate-mcp")
 def _configure_event_loop() -> None:
     """Select the event loop the database driver can actually run on.
 
@@ -105,6 +103,8 @@ def _configure_event_loop() -> None:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
+@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(__version__, prog_name="teslamate-mcp")
 def main() -> None:
     """TeslaMate MCP server — query your Tesla data from any MCP-aware client."""
 
