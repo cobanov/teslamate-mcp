@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-24
+
 ### Added
 - `get_current_car_status` returns the cabin climate (inside temperature,
   setpoints, fan, defrosters) and the four tire pressures. Most rows logged
