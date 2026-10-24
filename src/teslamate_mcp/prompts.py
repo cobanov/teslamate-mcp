@@ -66,7 +66,9 @@ def register_prompts(mcp: MCPServer) -> None:
             "`get_fast_charging_by_location` for how fast each fast charger was.\n"
             "3. Call `get_charging_costs` with group_by='month' and again with "
             "group_by='location'. If sessions_without_cost is not zero, call "
-            "`get_charging_cost_estimates` so the totals are not understated.\n"
+            "`get_charging_cost_estimates` so the totals are not understated. Call "
+            "`get_cost_per_distance` for the AC and DC price and the cost per 100 km, "
+            "and `get_charging_hours` for when the car charges.\n"
             "4. Highlight: home-vs-public split, kWh added per location, cost per "
             "kWh trends, and any session that looks unusually slow or expensive. "
             "For suspicious sessions, call `show_charging_curve_comparison` with "
@@ -80,7 +82,9 @@ def register_prompts(mcp: MCPServer) -> None:
     async def find_anomalies() -> str:
         return (
             "Look for anomalies in the recorded data:\n"
-            "1. Call `get_unusual_power_consumption` to fetch flagged events.\n"
+            "1. Call `get_health_checks` for anything already flagged (logging, "
+            "tires, parked drain, sleep, battery), and `get_unusual_power_consumption` "
+            "for drives that used too much.\n"
             "2. Call `get_efficiency_by_month_and_temperature` and "
             "`get_average_efficiency_by_temperature` to see whether the "
             "anomalies correlate with weather.\n"
@@ -123,9 +127,12 @@ def register_prompts(mcp: MCPServer) -> None:
             "3. Call `get_software_update_history` for the installed firmware and "
             "when it arrived. TeslaMate does not record whether an update is "
             "waiting, so do not claim one is or is not.\n"
-            "4. Present a single short paragraph: what the car is doing and since "
+            "4. Call `get_health_checks` and keep the rows whose status is alert "
+            "or warn.\n"
+            "5. Present a single short paragraph: what the car is doing and since "
             "when, where it is, battery level, climate state, and firmware. If "
-            "last_update is old, say that TeslaMate has lost contact with the car."
+            "last_update is old, say that TeslaMate has lost contact with the car. "
+            "End with the alerts and warnings, one line each, or say none."
         )
 
     @mcp.prompt(

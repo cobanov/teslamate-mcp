@@ -1,6 +1,6 @@
 """Server instructions: how to read the data and which tool answers what.
 
-Clients hand these to the model once per connection. With close to sixty
+Clients hand these to the model once per connection. With close to eighty
 tools, a short map from question to tool keeps the model from reaching for
 run_sql or the wrong granularity (drives vs trips), and the unit and time
 notes keep it from misreading the numbers.
@@ -31,10 +31,17 @@ def build_instructions(settings: Settings) -> str:
         "Which tool:",
         "- Where is the car, is it charging or asleep, cabin temperature, tire "
         "pressures: `get_current_car_status`. What it did on a day or week: "
-        "`get_timeline`. Drives or charges TeslaMate did not log: `get_logging_gaps`.",
+        "`get_timeline`. Drives or charges TeslaMate did not log: `get_logging_gaps`. "
+        "Is anything wrong (logging stopped, a tire losing pressure, high drain, "
+        "not sleeping, low battery): `get_health_checks` first.",
         "- Journeys: `get_trips` (TeslaMate ends a drive at every stop, so a journey "
-        "is several drives). Single drives: `search_drives`, `get_drive_details`. "
-        "A commute or any route driven again and again: `get_frequent_routes`.",
+        "is several drives). Single drives: `search_drives` (with consumption "
+        "against the usual at that temperature), `get_drive_details`. A commute or "
+        "any route driven again and again: `get_frequent_routes`. When the car is "
+        "driven: `get_driving_hours`. How it is driven (hard acceleration and "
+        "braking, speed): `get_driving_style`. Odometer over time: "
+        "`get_odometer_history`. Countries, provinces, and cities visited: "
+        "`get_regions_visited`; every road driven on a map: `show_driven_roads`.",
         "- Not sleeping, battery lost while parked: `get_state_history`, "
         "`get_idle_awake_periods`, `get_vampire_drain`. Climate run while parked "
         "(preconditioning, Keep Climate / Dog / Camp mode): "
@@ -44,11 +51,15 @@ def build_instructions(settings: Settings) -> str:
         "`get_charging_time_estimate`; hills: `get_efficiency_by_elevation`; what "
         "driving faster costs: `get_efficiency_by_speed`.",
         "- Battery health: `get_battery_capacity_trend` (energy-based) first, then "
-        "`get_battery_degradation_over_time`.",
+        "`get_battery_degradation_over_time` (per month) or "
+        "`get_projected_range_by_mileage` (per km). Charge cycles, capacity, and "
+        "lifetime AC and DC energy: `get_battery_health_summary`.",
         "- Charging: `search_charging_sessions`, `get_charging_session` (one AC or DC "
         "session), `get_fast_charging_sessions`, `get_fast_charging_by_location`. "
-        "Money: `get_charging_costs`, `get_charging_cost_estimates`, "
-        "`get_fuel_savings`. Geofence tariffs: `get_geofences`.",
+        "When it charges: `get_charging_hours`. Money: `get_charging_costs`, "
+        "`get_charging_cost_estimates`, `get_fuel_savings`; cost per 100 km and the "
+        "AC and DC price per month: `get_cost_per_distance`. Geofence tariffs: "
+        "`get_geofences`.",
         "- Overviews: `get_activity_report` (a month or year), `get_period_comparison`. "
         "A year or month in review, 'Wrapped': `show_recap` / `get_recap`.",
         "- Anything else: `get_database_schema`, then a read-only `run_sql`.",

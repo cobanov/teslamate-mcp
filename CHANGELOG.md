@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+- **`get_health_checks`**: "is anything wrong?" in one call. Eight checks per
+  car, worst first, each with a status (alert, warn, ok, unknown), a value and
+  unit, and a sentence naming the tool that shows more: days since TeslaMate
+  last logged the car, drives and charges left open, tire pressure spread and
+  one tire losing more than the others over four weeks (a slow leak), rated km
+  lost per day parked, hours a day awake while parked, charges to 95 % or more
+  that then sat 12 h, range at 100 % against the first charges, and the battery
+  level. The windows end at the car's last logged position, so a car TeslaMate
+  lost touch with still gets its last week judged.
+- **`get_driving_style`**: per month, hard accelerations and hard regenerative
+  braking per 100 km, the share of moving time above `fast_kmh`, top speed, the
+  share of energy regen recovered, and a 0-100 style score. Samples past the
+  power threshold within 10 s of each other count as one event.
+- **`get_projected_range_by_mileage`**: rated range at 100 % per odometer
+  bucket, from charges that ended at 50 % or more, with the drop from the
+  car's best bucket.
+- **`get_cost_per_distance`**: per month, distance, kWh added split into AC
+  and DC, cost, the AC, DC, and overall price per kWh, cost per 100 km, and
+  kWh charged per 100 km.
+- **`get_charging_hours`** and **`get_driving_hours`**: when the car charges
+  (by start hour, AC and DC apart) and when it is driven (a weekday x hour
+  grid).
+- **`get_regions_visited`**: the countries, provinces, and cities the car has
+  been to, with arrivals, charges, and first and last visit; `level` rolls
+  the list up.
+- **`get_odometer_history`**: the odometer at the first and last drive of each
+  month.
+- **`get_driven_roads`** and the **`show_driven_roads`** map: every road the
+  car has driven as one network. A route driven many times is drawn once (the
+  newest drive between each pair of places), and the paths come back as one
+  delta-coded string per car, so a map of 600 routes is about 30 KB.
+- `get_battery_health_summary` returns the range at 100 % from recent charges,
+  the usable capacity estimated from long charges, lifetime AC and DC energy,
+  and the charge cycles.
+- `get_drive_details` returns the energy the motors used and regenerative
+  braking recovered, integrated from the power samples.
+- `search_drives` returns each drive's Wh/km against the car's median at the
+  same outside temperature (within 3 °C).
+- The `status_report`, `find_anomalies`, and `analyze_charging` prompts call
+  the new tools.
+
 ## [0.16.0] - 2026-10-24
 
 ### Added

@@ -79,9 +79,9 @@ class Settings(BaseSettings):
         default=True,
         description=(
             "Draw an interactive basemap (CARTO vector tiles; Esri raster tiles where "
-            "the client cannot run it) under the route, trip, and places maps. Fetching "
-            "tiles reveals the rough area being viewed to that provider; set false to "
-            "keep the maps fully self-contained."
+            "the client cannot run it) under the route, trip, places, and roads maps. "
+            "Fetching tiles reveals the rough area being viewed to that provider; set "
+            "false to keep the maps fully self-contained."
         ),
     )
 
