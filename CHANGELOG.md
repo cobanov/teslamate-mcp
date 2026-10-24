@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-24
+
 ### Added
 - **`get_health_checks`**: "is anything wrong?" in one call. Eight checks per
   car, worst first, each with a status (alert, warn, ok, unknown), a value and
