@@ -1,0 +1,185 @@
+name = "get_recap"
+description = "A year or a month in review, in one row: drives, distance, driving time, days driven, consumption, distance against the period before (cut at the same point while the period is still running), odometer, charging sessions, DC sessions, kWh and recorded cost, and highlights: the longest drive with where it went, the busiest day, the most efficient day or month, the most visited destination, the most used charging location, top speed, and the coldest and hottest drive, plus software updates installed. Defaults to the current year; pass period='month' (and year, month) for a month. Prefer show_recap when the user asks for a year or month in review, a wrap-up, or 'Wrapped'."
+
+[[params]]
+name = "period"
+type = "string"
+description = "year: a calendar year. month: a calendar month."
+default = "year"
+enum = ["year", "month"]
+
+[[params]]
+name = "year"
+type = "integer"
+description = "Calendar year. Defaults to the current year."
+minimum = 2000
+maximum = 2100
+
+[[params]]
+name = "month"
+type = "integer"
+description = "Calendar month 1-12, for period=month. Defaults to the current month."
+minimum = 1
+maximum = 12
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars combined."
+
+[[output]]
+name = "period"
+type = "string"
+description = "YYYY or YYYY-MM."
+
+[[output]]
+name = "period_start"
+type = "string"
+description = "First local day, YYYY-MM-DD."
+
+[[output]]
+name = "period_end"
+type = "string"
+description = "Last local day, YYYY-MM-DD."
+
+[[output]]
+name = "in_progress"
+type = "boolean"
+description = "True while the period has not ended yet."
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "driving_hours"
+type = "number"
+
+[[output]]
+name = "days_driven"
+type = "integer"
+description = "Local days with at least one drive."
+
+[[output]]
+name = "energy_used_kwh"
+type = "number"
+description = "Rated range used x the car's efficiency."
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+
+[[output]]
+name = "previous_distance_km"
+type = "number"
+description = "Distance in the period before; while this period is running, only up to the same point in it."
+
+[[output]]
+name = "distance_change_pct"
+type = "number"
+description = "distance_km against previous_distance_km, percent."
+
+[[output]]
+name = "odometer_km"
+type = "number"
+description = "Odometer at the end of the period's last drive."
+
+[[output]]
+name = "charging_sessions"
+type = "integer"
+
+[[output]]
+name = "dc_sessions"
+type = "integer"
+description = "Fast-charging (DC) sessions."
+
+[[output]]
+name = "kwh_added"
+type = "number"
+
+[[output]]
+name = "charging_cost"
+type = "number"
+description = "Sum of recorded costs; null when no session has one."
+
+[[output]]
+name = "longest_drive_km"
+type = "number"
+
+[[output]]
+name = "longest_drive_date"
+type = "string"
+description = "Local day, YYYY-MM-DD."
+
+[[output]]
+name = "longest_drive_from"
+type = "string"
+description = "Geofence name or address."
+
+[[output]]
+name = "longest_drive_to"
+type = "string"
+description = "Geofence name or address."
+
+[[output]]
+name = "busiest_day"
+type = "string"
+description = "Local day with the most distance, YYYY-MM-DD."
+
+[[output]]
+name = "busiest_day_km"
+type = "number"
+
+[[output]]
+name = "most_efficient"
+type = "string"
+description = "The day (month period, at least 20 km) or month (year period, at least 100 km) with the lowest consumption."
+
+[[output]]
+name = "most_efficient_wh_per_km"
+type = "number"
+
+[[output]]
+name = "top_destination"
+type = "string"
+description = "Where drives ended most often: geofence name or address."
+
+[[output]]
+name = "top_destination_arrivals"
+type = "integer"
+
+[[output]]
+name = "top_charging_location"
+type = "string"
+description = "Geofence name or address."
+
+[[output]]
+name = "top_charging_location_sessions"
+type = "integer"
+
+[[output]]
+name = "top_speed_kmh"
+type = "number"
+
+[[output]]
+name = "coldest_drive_temp"
+type = "number"
+description = "Lowest average outside temperature of a drive, °C."
+
+[[output]]
+name = "hottest_drive_temp"
+type = "number"
+description = "Highest average outside temperature of a drive, °C."
+
+[[output]]
+name = "software_updates"
+type = "integer"
+
+[[output]]
+name = "latest_version"
+type = "string"
+description = "Latest software version installed in the period."

@@ -1,0 +1,36 @@
+name = "get_geofences"
+description = "Every TeslaMate geo-fence: name, center, radius (meters), cost_per_unit, session_fee, and billing_type (per_kwh or per_minute). This is the fence directory. Charging totals by fence are get_charging_by_geofence."
+
+[[output]]
+name = "geofence_id"
+type = "integer"
+
+[[output]]
+name = "name"
+type = "string"
+
+[[output]]
+name = "latitude"
+type = "number"
+
+[[output]]
+name = "longitude"
+type = "number"
+
+[[output]]
+name = "radius_m"
+type = "integer"
+
+[[output]]
+name = "cost_per_unit"
+type = "number"
+description = "Price per kWh or per minute, matching billing_type. Null when the fence has no tariff."
+
+[[output]]
+name = "session_fee"
+type = "number"
+
+[[output]]
+name = "billing_type"
+type = "string"
+description = "per_kwh or per_minute."

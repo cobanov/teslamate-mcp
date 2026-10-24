@@ -1,0 +1,83 @@
+name = "get_charging_session"
+description = "Header for one charging session, AC or DC, by charging_process_id (find ids with search_charging_sessions). Returns energy added and energy used (kWh), start and end state of charge (%), cost, duration (minutes), geo-fence, address, charger kind (ac, supercharger, or other_dc), the usual phase count, the charge cable, and peak power (kW). A session with no cost has cost null. That means unknown, not free."
+
+[[params]]
+name = "charging_process_id"
+type = "integer"
+description = "The charging_processes id."
+required = true
+
+[[output]]
+name = "charging_process_id"
+type = "integer"
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+
+[[output]]
+name = "end_date"
+type = "string"
+
+[[output]]
+name = "start_local"
+type = "string"
+description = "Session start in REPORT_TIMEZONE, YYYY-MM-DD HH:MM."
+
+[[output]]
+name = "duration_min"
+type = "integer"
+
+[[output]]
+name = "start_soc"
+type = "integer"
+
+[[output]]
+name = "end_soc"
+type = "integer"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+description = "Energy the battery gained."
+
+[[output]]
+name = "energy_used_kwh"
+type = "number"
+description = "Energy drawn from the charger. Null when TeslaMate did not record it."
+
+[[output]]
+name = "cost"
+type = "number"
+
+[[output]]
+name = "geofence_name"
+type = "string"
+
+[[output]]
+name = "location"
+type = "string"
+description = "Address TeslaMate stored for the session."
+
+[[output]]
+name = "charger_kind"
+type = "string"
+description = "ac, supercharger, or other_dc. Null when the session has no charge samples."
+
+[[output]]
+name = "phases"
+type = "integer"
+description = "Most common AC phase count while power flowed. Null on DC."
+
+[[output]]
+name = "cable"
+type = "string"
+description = "Most common charge cable name on the samples."
+
+[[output]]
+name = "peak_power_kw"
+type = "integer"

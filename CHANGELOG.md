@@ -4,6 +4,152 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-24
+
+### Added
+- **`get_health_checks`**: "is anything wrong?" in one call. Eight checks per
+  car, worst first, each with a status (alert, warn, ok, unknown), a value and
+  unit, and a sentence naming the tool that shows more: days since TeslaMate
+  last logged the car, drives and charges left open, tire pressure spread and
+  one tire losing more than the others over four weeks (a slow leak), rated km
+  lost per day parked, hours a day awake while parked, charges to 95 % or more
+  that then sat 12 h, range at 100 % against the first charges, and the battery
+  level. The windows end at the car's last logged position, so a car TeslaMate
+  lost touch with still gets its last week judged.
+- **`get_driving_style`**: per month, hard accelerations and hard regenerative
+  braking per 100 km, the share of moving time above `fast_kmh`, top speed, the
+  share of energy regen recovered, and a 0-100 style score. Samples past the
+  power threshold within 10 s of each other count as one event.
+- **`get_projected_range_by_mileage`**: rated range at 100 % per odometer
+  bucket, from charges that ended at 50 % or more, with the drop from the
+  car's best bucket.
+- **`get_cost_per_distance`**: per month, distance, kWh added split into AC
+  and DC, cost, the AC, DC, and overall price per kWh, cost per 100 km, and
+  kWh charged per 100 km.
+- **`get_charging_hours`** and **`get_driving_hours`**: when the car charges
+  (by start hour, AC and DC apart) and when it is driven (a weekday x hour
+  grid).
+- **`get_regions_visited`**: the countries, provinces, and cities the car has
+  been to, with arrivals, charges, and first and last visit; `level` rolls
+  the list up.
+- **`get_odometer_history`**: the odometer at the first and last drive of each
+  month.
+- **`get_driven_roads`** and the **`show_driven_roads`** map: every road the
+  car has driven as one network. A route driven many times is drawn once (the
+  newest drive between each pair of places), and the paths come back as one
+  delta-coded string per car, so a map of 600 routes is about 30 KB.
+- `get_battery_health_summary` returns the range at 100 % from recent charges,
+  the usable capacity estimated from long charges, lifetime AC and DC energy,
+  and the charge cycles.
+- `get_drive_details` returns the energy the motors used and regenerative
+  braking recovered, integrated from the power samples.
+- `search_drives` returns each drive's Wh/km against the car's median at the
+  same outside temperature (within 3 °C).
+- The `status_report`, `find_anomalies`, and `analyze_charging` prompts call
+  the new tools.
+
+## [0.16.0] - 2026-10-24
+
+### Added
+- `get_current_car_status` returns the cabin climate (inside temperature,
+  setpoints, fan, defrosters) and the four tire pressures. Most rows logged
+  while driving have neither, so each group comes from the latest row that has
+  it, up to 7 days before `last_update`. `climate_at` and `tpms_at` give the
+  time of that row.
+- **`get_charging_session`**: one charging session, AC or DC, by id: energy
+  added and used, battery % at start and end, cost, duration, geofence, AC
+  phases, cable, and peak power. It uses the same DC test as the fast-charging
+  tools.
+- **`get_geofences`**: each TeslaMate geofence with its center, radius, cost
+  per unit, session fee, and billing type.
+- **`get_logging_gaps`**: drives and charges that TeslaMate never closed, and
+  position holes of at least `min_hours`. A hole counts only when the odometer
+  moved or the battery level rose across it, because a parked car logs
+  nothing and a drop alone is idle drain.
+- `get_drive_details` returns the ideal range at start and end, and the start
+  and end geofence names.
+
+## [0.15.0] - 2026-10-12
+
+### Changed
+- **Interactive maps.** `show_drive_route`, `show_trip_route`, and
+  `show_visited_places` now draw with MapLibre GL over CARTO's vector basemap
+  (Positron or Dark Matter, matching the client), with pan and zoom, zoom and
+  fit buttons, a scale, and labelled places. The route is one blue line with
+  a ring at the start and a dot at the end; charging stops and places charged
+  at are green. Hover readouts and the elevation profile work as before.
+  MapLibre is bundled (`apps/vendor/`), so nothing loads from a CDN; a map
+  view is now about 1.2 MB.
+- Where the client cannot run MapLibre (no WebGL, or a host that forbids
+  `blob:` workers) or the basemap does not load, the views fall back to the
+  previous static map over Esri's gray canvas.
+- `MAP_TILES` now covers both basemaps: the views declare CARTO's hosts (and
+  Esri's, for the fallback) to the client. With `MAP_TILES=false` the map
+  library is not sent and the views stay self-contained.
+
+### Added
+- **`get_efficiency_by_speed`**: consumption per speed band, from the samples
+  TeslaMate logs while driving (power x time over speed x time), with the
+  distance and hours in each band and the difference from the car's most
+  efficient band. Optionally only drives near a given outside temperature.
+  This is battery power while moving, so it reads lower than the rated-range
+  consumption of the drive tools: the bands compare with each other.
+- **`get_charging_time_estimate`** ("how long will the stop take?"): minutes
+  from one battery % to another per charger type (Supercharger, other fast
+  charger, AC), from the time past sessions spent at each battery percent, so
+  the taper and AC losses are in it. Returns a typical and a slow (90th
+  percentile) figure, the kWh added, and the battery band the history covers;
+  no time when a percent on the way has no history.
+- **`get_frequent_routes`**: the routes a car drives again and again, each
+  direction on its own, with typical distance and duration, the fastest and
+  slowest run, consumption, and the usual departure hour;
+  `by_departure_hour=true` gives a row per departure hour. Places are
+  geofences, or areas about twice `place_radius_m` across, because TeslaMate
+  resolves parking spots a few metres apart to different addresses.
+- `get_trip_energy_estimate` takes `avg_speed_kmh`: only past drives that
+  averaged within 15 km/h of it, which is finer than `highway`.
+- The `plan_trip` prompt passes the average speed and times the charging stop.
+
+### Fixed
+- `get_trips`, `get_trip_details` and `get_trip_route` became very slow on a
+  long history, because they looked through the car's charging sessions once
+  for every drive. They now pair drives and sessions in one pass: on a test
+  history of 60,000 drives and 12,000 sessions `get_trips` went from 47 s to
+  0.5 s. The trips themselves are unchanged.
+- `get_timeline` puts only the activities around its window in order, not the
+  car's whole history, and reads the state log once for the parks it shows
+  (334 ms to 58 ms on the same history; 673 ms to 66 ms for 500 rows).
+- With Cloudflare Access sign-in, the server asks Cloudflare for its signing
+  keys at most once every 30 seconds. A token naming an unknown key id used to
+  trigger a fetch each time, so anyone could make the server call Cloudflare
+  once per request. A newly rotated key is now accepted up to 30 seconds late.
+
+## [0.14.0] - 2026-09-30
+
+### Added
+- **Climate run while parked**, from the climate state TeslaMate records in
+  its polled samples.
+  - `get_parked_climate_sessions`: each time the climate ran while parked
+    (preconditioning before a drive, cooling down after arriving, Keep
+    Climate / Dog / Camp mode), with minutes, estimated battery kWh, cooling
+    or heating, temperatures, set temperature, and where. Each sample stands
+    for the time until the next one, capped at 10 minutes and at the next
+    drive's start; plugged-in time counts toward duration but not battery
+    energy.
+  - `get_climate_usage`: the same per month, with the preconditioning count,
+    hours plugged in, and the energy's estimated cost at that month's average
+    recorded price.
+- **A year or month in review.** `get_recap` / `show_recap` (a new chart):
+  totals, the distance against the period before (cut at the same point while
+  the period is still running, so a year in progress is not measured against
+  a whole year), charging and cost, and highlights: the longest drive and
+  where it went, the busiest day, the most efficient day or month, the
+  favourite destination and charging spot, top speed, the temperature range,
+  and software updates. Defaults to the current year; `period='month'` for a
+  month.
+- `year_in_review` prompt; `monthly_recap` now starts from `show_recap` and
+  adds the climate used while parked.
+
 ## [0.13.5] - 2026-09-30
 
 ### Added

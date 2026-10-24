@@ -5,7 +5,7 @@
 <img src="assets/teslamcp.gif" alt="TeslaMate MCP Server demo" width="720" />
 
 Connect your AI assistant to your [TeslaMate](https://github.com/teslamate-org/teslamate) data.
-This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 57 tools, 11 prompts, and interactive charts.
+This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server. It reads your TeslaMate PostgreSQL database. It gives MCP clients (Claude Desktop, Cursor, and others) 77 tools, 12 prompts, and interactive charts.
 
 [![CI](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cobanov/teslamate-mcp/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/cobanov/teslamate-mcp?logo=github&sort=semver)](https://github.com/cobanov/teslamate-mcp/releases)
@@ -27,12 +27,15 @@ This is a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) serve
 - "Can I reach Ankara (450 km) at 5°C without charging?" — the server estimates the arrival battery % from your own drives at that temperature.
 - "Why isn't my car sleeping?" — the server reads TeslaMate's state log and lists the periods the car stayed awake while parked.
 - "What did my car do on Saturday?" — one call returns the drives, charges, and parked time in order.
+- "How long will the charging stop take, and when should I leave for work?" — the server times a charge from your own past sessions, and finds the routes you drive again and again.
+- "Is anything wrong with my car?" — one call checks logging, open drives, tire pressures and slow leaks, parked drain, sleep, full charges left sitting, range loss, and the battery level.
+- "What does driving cost me per 100 km, and how calmly do I drive?" — the server splits charging into AC and DC prices per month, and counts hard accelerations and hard braking from the power samples.
 
 ## Highlights
 
-- **47 SQL report tools.** Battery capacity and degradation, sleep and state history, a timeline of each day, trips, range estimates, fast-charging speeds, charging costs (with estimates for missing ones) and fuel savings, elevation, vampire drain, geofences, driving patterns, routes, and search tools for drives and charging sessions.
-- **8 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a map of visited places, and consumption against temperature. On clients without chart support, the same tools return plain rows.
-- **Guidance for the assistant.** MCP instructions and 11 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
+- **65 SQL report tools.** A health check, battery capacity, charge cycles and degradation (per month and per km), sleep and state history, climate run while parked, a year or month in review, a timeline of each day, trips, frequent routes, range and charging-time estimates, consumption by speed, driving style, fast-charging speeds, charging costs (with estimates for missing ones), cost per 100 km, and fuel savings, elevation, vampire drain, geofences, driving and charging hours, the regions visited, routes, and search tools for drives and charging sessions.
+- **10 interactive charts (MCP Apps).** Charging curves (one session, or several overlaid), battery degradation, drive and trip maps with elevation profiles, a monthly or yearly activity dashboard, a year- or month-in-review card, a map of visited places, a map of every road driven, and consumption against temperature. On clients without chart support, the same tools return plain rows.
+- **Guidance for the assistant.** MCP instructions and 12 prompts map questions to tools, and `get_unit_preferences` lets the assistant answer in the units set in TeslaMate.
 - **Typed inputs and outputs.** Each report tool declares its parameters and result columns in a `.toml` file. The server validates the declarations at startup. Parameters bind as SQL placeholders, never as string concatenation.
 - **Safe custom SQL.** `run_sql` runs your `SELECT` inside a PostgreSQL `READ ONLY` transaction, with timeouts and a row cap. The transaction always rolls back.
 - **Optional cost writes, with confirmation.** One opt-in tool writes charging costs. A column-scoped database grant limits what it can touch. Clients with MCP elicitation show a confirmation dialog first.
@@ -105,50 +108,60 @@ Tools return metric values (km, km/h, °C, bar, m) and rated range. `get_unit_pr
 
 The server also sends MCP `instructions`: how to read units, time zones and costs, and which tool answers which kind of question.
 
-### Reports (22)
+### Reports (28)
 
 | Group | Tools |
 |---|---|
 | Vehicle | `get_basic_car_information`, `get_current_car_status`, `get_software_update_history`, `get_unit_preferences` |
 | Battery | `get_battery_health_summary`, `get_battery_degradation_over_time`, `get_daily_battery_usage_patterns`, `get_tire_pressure_weekly_trends` |
-| Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`, `get_visited_places` |
-| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |
+| Driving | `get_monthly_driving_summary`, `get_daily_driving_patterns`, `get_driving_hours`, `get_longest_drives_by_distance`, `get_total_distance_and_efficiency`, `get_drive_summary_per_day`, `get_odometer_history`, `get_visited_places`, `get_regions_visited`, `get_frequent_routes`, `get_driven_roads` |
+| Efficiency | `get_efficiency_by_month_and_temperature`, `get_average_efficiency_by_temperature`, `get_efficiency_by_elevation`, `get_efficiency_by_speed`, `get_drive_efficiency_points`, `get_unusual_power_consumption` |
 | Charging | `get_charging_by_location`, `get_all_charging_sessions_summary`, `get_most_visited_locations` |
 
-### Insights (8)
+### Insights (16)
 
 | Tool | What it returns |
 |---|---|
+| `get_health_checks` | "Is anything wrong?": eight checks per car, worst first, each with alert, warn, ok, or unknown, a value, and what it means: days since TeslaMate last logged the car, drives and charges left open, tire pressure spread and a tire losing more than the others (a slow leak), rated km lost per day parked, hours a day awake while parked, charges to 95 % or more left sitting, range lost since the first charges, and the battery level |
 | `get_battery_capacity_trend` | Usable capacity in kWh, estimated from charging sessions (energy added ÷ SOC gained), per month and car |
+| `get_projected_range_by_mileage` | Rated range at 100 % per odometer bucket (1000 km by default), from charges that ended at 50 % or more, with the drop from the car's best bucket; degradation per km, like TeslaMate's Projected Range dashboard |
+| `get_driving_style` | Per month: hard accelerations and hard regenerative braking per 100 km, time above a speed (120 km/h by default), top speed, the share of energy regen recovered, and a 0–100 style score; thresholds are parameters |
+| `get_charging_hours` | Charging sessions by the local hour they started, AC and DC apart, with kWh and each hour's share; shows whether home charging lands in a night tariff |
 | `get_vampire_drain` | Range lost while parked between drives; gaps that contain a charge do not count |
 | `get_charging_efficiency` | kWh added vs kWh drawn per car, split into AC and DC |
 | `get_charging_by_geofence` | Charging totals per TeslaMate geofence, plus an "Ungeofenced" group |
 | `get_soc_hygiene` | Share of samples above 80% and below 20% state of charge |
 | `get_period_comparison` | The last N days vs the N days before, one row per metric |
 | `get_activity_report` | A month by day or a year by month: drives, distance, consumption, charging, and cost per bucket, empty days included |
-| `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only), with a conservative figure and the arrival battery % |
+| `get_recap` | A year or month in review in one row: totals, distance against the period before (cut at the same point while it runs), charging and cost, and highlights: longest drive, busiest day, most efficient day or month, favourite destination and charging spot, top speed, temperature range, software updates |
+| `get_parked_climate_sessions` | Times the climate ran while parked (preconditioning, cooling down after arriving, Keep Climate / Dog / Camp mode): minutes, estimated battery kWh, cooling or heating, temperatures, and where |
+| `get_climate_usage` | The same per month: sessions, preconditioning count, hours, hours plugged in, estimated kWh and cost |
+| `get_trip_energy_estimate` | "Will I make it?": energy and battery % a drive of a given distance takes, from this car's own drives at a similar temperature (optionally motorway drives only, or drives at a given average speed), with a conservative figure and the arrival battery % |
+| `get_charging_time_estimate` | "How long will the stop take?": minutes from one battery % to another per charger type (Supercharger, other fast charger, AC), from the time past sessions spent at each percent, with a slow figure and the kWh added |
 
-### Timeline and car state (3)
+### Timeline and car state (4)
 
-TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now.
+TeslaMate logs whether each car is online, asleep, or offline. `get_current_car_status` reads that log too, and reports whether the car is driving, charging, online, asleep, or offline right now. It also gives the cabin climate and the four tire pressures. Most rows logged while driving have neither, so each group comes from the latest row that has it, with the time of that row.
 
 | Tool | What it returns |
 |---|---|
 | `get_timeline` | What the car did, in order: drives, charges, the time parked between them, and software updates, with places, battery %, kWh, and cost; answers "what did my car do on Saturday?" |
 | `get_state_history` | Per car and local day: hours online, asleep, and offline, driving and charging hours, idle awake hours (online while parked and not charging), and wake-ups |
 | `get_idle_awake_periods` | The online periods that kept the car awake while parked, longest first, with where it was parked; answers "why isn't my car sleeping?" |
+| `get_logging_gaps` | Logging holes: drives and charges TeslaMate never closed, and stretches with no position across which the odometer moved or the battery level rose (a drive or charge that was not logged). A parked car logs nothing, so long parks stay out |
 
-### Search and detail (5)
+### Search and detail (6)
 
 | Tool | What it returns |
 |---|---|
-| `search_drives` | Drives filtered by date range, location text, distance, and car; sortable |
+| `search_drives` | Drives filtered by date range, location text, distance, and car; sortable. Each drive has its Wh/km against what the car usually uses at the same outside temperature |
 | `search_charging_sessions` | Charging sessions filtered by date range, location, energy, and car |
-| `get_drive_details` | Full statistics for one drive |
+| `get_drive_details` | Full statistics for one drive, with ideal range, the start and end geofence names, and the energy the motors used and regenerative braking recovered |
 | `get_drive_route` | GPS track points for one drive, downsampled |
 | `get_charging_curve` | Power and SOC curve for one charging session, downsampled |
+| `get_charging_session` | One charging session, AC or DC: energy added and used, battery % at start and end, cost, duration, geofence, AC phases, cable, and peak power |
 
-### Costs (3)
+### Costs (5)
 
 A session with no cost recorded counts as unknown, not free: averages per kWh use only the sessions that have a cost, and each report says how many sessions lack one.
 
@@ -156,7 +169,9 @@ A session with no cost recorded counts as unknown, not free: averages per kWh us
 |---|---|
 | `get_charging_costs` | Costs grouped by month, location, or car, with the number of sessions that have no cost |
 | `get_charging_cost_estimates` | An estimated cost for each session with none: free Supercharging, a price you give, the geofence tariff, what you paid at the same place, or the typical price for that charger type |
+| `get_cost_per_distance` | Per month: distance, kWh added split into AC and DC, cost, the AC, DC, and overall price per kWh, cost per 100 km, and kWh charged per 100 km |
 | `get_fuel_savings` | What the same distance would have cost in fuel, against what charging cost, per car |
+| `get_geofences` | Each TeslaMate geofence with its center, radius, and tariff: cost per unit, session fee, and billing type |
 
 ### Trips (3)
 
@@ -178,18 +193,18 @@ A session is DC when a sample came from a fast charger, or had no AC phases whil
 | `get_fast_charging_by_location` | The same per location and charger type: which fast chargers are fastest and cheapest for your car |
 | `get_charging_curve_comparison` | Power against battery % for several sessions, for overlaying their curves |
 
-### Charts (8)
+### Charts (10)
 
-`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, and `show_efficiency_vs_temperature` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route and trip maps draw the track over a low-detail basemap (Esri gray canvas, light or dark to match the client); the trip map also marks every stop, with charging stops highlighted. Both maps draw an elevation profile under the track; hovering it finds the place on the map. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. Set `MAP_TILES=false` to keep the maps fully offline.
+`show_charging_curve`, `show_charging_curve_comparison`, `show_battery_degradation`, `show_drive_route`, `show_trip_route`, `show_activity_report`, `show_visited_places`, `show_driven_roads`, `show_efficiency_vs_temperature`, and `show_recap` are the chart versions of their `get_*` tools. On chart-capable clients they draw an interactive chart in the conversation. On other clients they return the same rows as the `get_*` tool. The route, trip, places, and roads maps are interactive (pan, zoom, fit) and draw over CARTO's light or dark basemap, matching the client; the trip map also marks every stop, with charging stops highlighted. The route and trip maps draw an elevation profile under the track; hovering it finds the place on the map. Where the client cannot run the interactive map (no WebGL, or workers blocked), a static map over Esri's gray canvas is drawn instead. `show_activity_report` is a monthly or yearly dashboard, `show_visited_places` maps where the car parks (sized by arrivals, charging places highlighted), `show_driven_roads` draws every road the car has driven as one network (a route driven many times is drawn once: the newest drive between each pair of places), and `show_efficiency_vs_temperature` plots every drive's consumption against outside temperature with the 5 °C average. `show_recap` is a year- or month-in-review card with the headline distance and highlights. Set `MAP_TILES=false` to keep the maps fully offline.
 
 ### Custom (2)
 
 - `get_database_schema` — lists all tables, shows the columns of one table, and re-reads the schema when you pass `refresh=true`.
 - `run_sql` — runs one custom `SELECT` or `WITH … SELECT`.
 
-### Prompts (11)
+### Prompts (12)
 
-Ready-made workflows that name the tools to call, in order: `status_report`, `summarize_driving`, `analyze_battery_health`, `analyze_charging`, `find_anomalies`, `weather_efficiency`, `diagnose_sleep`, `plan_trip`, `review_trip`, `monthly_recap`, and `charging_costs_and_savings`. With cost writes on, `backfill_costs_from_receipts` joins them.
+Ready-made workflows that name the tools to call, in order: `status_report`, `summarize_driving`, `analyze_battery_health`, `analyze_charging`, `find_anomalies`, `weather_efficiency`, `diagnose_sleep`, `plan_trip`, `review_trip`, `monthly_recap`, `year_in_review`, and `charging_costs_and_savings`. With cost writes on, `backfill_costs_from_receipts` joins them.
 
 ### Cost writes (opt-in, off by default)
 
@@ -221,7 +236,7 @@ The server reads all settings from environment variables. It also reads a `.env`
 | `QUERY_TIMEOUT_MS`      | `5000`      | Tighter `statement_timeout` for `run_sql`                   |
 | `CUSTOM_SQL_ROW_LIMIT`  | `1000`      | Most rows `run_sql` returns, whatever its `LIMIT`           |
 | `REPORT_TIMEZONE`       | `UTC`       | IANA timezone for report buckets                            |
-| `MAP_TILES`             | `true`      | Basemap under the route, trip, and places maps (Esri tiles) |
+| `MAP_TILES`             | `true`      | Interactive basemap under the route, trip, places, and roads maps (CARTO tiles; Esri as fallback) |
 | `ENABLE_CHARGING_WRITES`| `false`     | Registers `set_charging_cost`                               |
 | `LOG_LEVEL`             | `INFO`      | Python log level                                            |
 | `DEBUG`                 | `false`     | Starlette debug mode; keep off in production                |
@@ -270,7 +285,7 @@ The startup validation rejects a query when a declared parameter is missing from
 
 - `run_sql` runs in a `READ ONLY` transaction that always rolls back. Timeouts and a row cap apply.
 - Connect with a `SELECT`-only PostgreSQL role, not TeslaMate's own `teslamate` user. TeslaMate's Compose makes that user a superuser, and a read-only transaction still lets a superuser read server files through `run_sql`. [SECURITY.md](SECURITY.md) has the `CREATE ROLE` snippet.
-- The maps' basemap tiles are fetched from Esri by the viewer's browser, which reveals the rough area being viewed. `MAP_TILES=false` turns this off.
+- The maps' basemap is fetched by the viewer's browser from CARTO (from Esri where the client cannot run the interactive map), which reveals the viewer's IP address and the rough area being viewed. The map library itself (MapLibre GL) is served by this server, not a CDN. `MAP_TILES=false` turns this off.
 - The HTTP transport compares bearer tokens with a timing-safe function. Behind Cloudflare Access, it can instead verify the signed `Cf-Access-Jwt-Assertion` (signature, issuer, audience, expiry).
 - Report vulnerabilities through [private security advisories](https://github.com/cobanov/teslamate-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
 

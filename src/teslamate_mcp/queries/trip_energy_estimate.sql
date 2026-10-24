@@ -11,7 +11,8 @@ WITH scope_cars AS (
 ),
 -- Past drives, tiered by how close their temperature was to the forecast.
 -- Drives with implausible consumption (range recalibrations, GPS gaps) are
--- dropped; highway mode keeps only long drives averaging 70 km/h or more.
+-- dropped; highway mode keeps only long drives averaging 70 km/h or more, and
+-- avg_speed_kmh only drives that averaged within 15 km/h of it.
 history AS (
     SELECT d.car_id,
         d.distance,
@@ -29,8 +30,13 @@ history AS (
         JOIN scope_cars c ON c.id = d.car_id
     WHERE d.end_date IS NOT NULL
         AND d.start_date >= (now() AT TIME ZONE 'UTC') - make_interval(days => %(days)s::int)
-        AND d.distance >= CASE WHEN %(highway)s::boolean THEN 20 ELSE 5 END
+        AND d.distance >= CASE
+            WHEN %(highway)s::boolean OR %(avg_speed_kmh)s::float8 >= 70 THEN 20
+            ELSE 5
+        END
         AND (NOT %(highway)s::boolean OR d.distance / NULLIF(d.duration_min, 0) * 60 >= 70)
+        AND (%(avg_speed_kmh)s::float8 IS NULL
+            OR ABS(d.distance / NULLIF(d.duration_min, 0) * 60 - %(avg_speed_kmh)s::float8) <= 15)
         AND (d.start_rated_range_km - d.end_rated_range_km) * c.efficiency * 1000 / d.distance
             BETWEEN 50 AND 600
 ),
@@ -129,6 +135,7 @@ SELECT e.car_name,
         ELSE 'drives at all temperatures'
     END AS based_on,
     %(highway)s::boolean AS highway,
+    %(avg_speed_kmh)s::float8 AS avg_speed_kmh,
     COALESCE(e.drives, 0) AS drives_used,
     ROUND(e.km::numeric) AS km_used,
     ROUND(e.wh_expected::numeric) AS wh_per_km_expected,

@@ -1,0 +1,50 @@
+name = "get_driving_hours"
+description = "When the car is driven, as a weekday x hour grid: drives grouped by the local weekday (1 = Monday) and hour (0-23) they started, per car, with drive count, distance km, driving hours, and average outside temperature. Only cells with a drive are returned. Shows the commute peaks and the weekend pattern. Optional filters: car_name, days. get_daily_driving_patterns has the totals per weekday."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "weekday"
+type = "integer"
+description = "ISO weekday, 1 = Monday to 7 = Sunday, in the report timezone."
+
+[[output]]
+name = "weekday_name"
+type = "string"
+
+[[output]]
+name = "start_hour"
+type = "integer"
+description = "Local hour of day the drives started, 0-23."
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "driving_hours"
+type = "number"
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+description = "°C."

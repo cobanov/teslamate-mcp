@@ -1,0 +1,69 @@
+name = "get_logging_gaps"
+description = "Logging holes, the Database Information check. Lists drives and charges whose end_date is still null, and stretches with no position sample that hide a drive or a charge, when the hole is at least min_hours long (default 24, so one night asleep stays out). A parked car logs nothing, so a position hole counts only when the odometer moved (at least 0.1 km) or the battery level rose across it. A drop alone is idle drain and does not count. Position holes are sought over the last `days` (default 30), plus the one sample before that window. record_id is the drive id or charging_process id. It is null for a position hole. Optional filter: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "min_hours"
+type = "integer"
+description = "Smallest hole to return, in hours. A night asleep is usually under 24."
+default = 24
+minimum = 1
+maximum = 8760
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days of positions to scan for holes."
+default = 30
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows, longest hole first."
+default = 50
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "gap_kind"
+type = "string"
+description = "open_drive, open_charge, or position_hole."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "started_at"
+type = "string"
+description = "UTC. For an open row, when the drive or charge started. For a hole, the last sample before the gap."
+
+[[output]]
+name = "ended_at"
+type = "string"
+description = "UTC end of a position hole. Null while a drive or charge is still open."
+
+[[output]]
+name = "duration_hours"
+type = "number"
+
+[[output]]
+name = "record_id"
+type = "integer"
+description = "Drive id or charging_process id. Null for a position hole."
+
+[[output]]
+name = "odometer_change_km"
+type = "number"
+description = "Odometer change across a position hole, km. Above 0 means a drive TeslaMate did not log. Null for an open row."
+
+[[output]]
+name = "battery_change"
+type = "integer"
+description = "Battery level change across a position hole, percentage points. Above 0 means a charge TeslaMate did not log. Null for an open row."

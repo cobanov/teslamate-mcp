@@ -27,17 +27,38 @@ legs AS (
     FROM scope s
     WINDOW w AS (PARTITION BY s.car_id ORDER BY s.start_date)
 ),
+-- The latest charging session that started before each drive, from one pass
+-- over the drives and the sessions in time order. Asking per drive whether a
+-- session falls in the stop before it reads the car's sessions once for
+-- every drive, which takes minutes on a long history.
+last_charge AS (
+    SELECT e.drive_id,
+        MAX(e.charge_start) OVER (
+            PARTITION BY e.car_id ORDER BY e.at, e.drive_id IS NULL
+        ) AS charge_start
+    FROM (
+        SELECT s.car_id,
+            s.start_date AS at,
+            s.drive_id,
+            NULL::timestamp AS charge_start
+        FROM scope s
+        UNION ALL
+        SELECT cp.car_id,
+            cp.start_date,
+            NULL,
+            cp.start_date
+        FROM charging_processes cp
+        WHERE cp.car_id IN (SELECT car_id FROM scope)
+    ) e
+),
+-- The car charged during a stop when that session started after the drive
+-- before had ended.
 stops AS (
     SELECT l.*,
         EXTRACT(EPOCH FROM (l.start_date - l.prev_end)) / 60.0 AS stop_before_min,
-        EXISTS (
-            SELECT 1
-            FROM charging_processes cp
-            WHERE cp.car_id = l.car_id
-                AND cp.start_date >= l.prev_end
-                AND cp.start_date < l.start_date
-        ) AS charged_before
+        COALESCE(lc.charge_start >= l.prev_end, FALSE) AS charged_before
     FROM legs l
+        JOIN last_charge lc ON lc.drive_id = l.drive_id
 ),
 marked AS (
     SELECT st.*,

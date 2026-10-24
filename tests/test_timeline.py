@@ -79,6 +79,25 @@ async def test_timeline_park_sleep_share_and_ongoing_park(mcp_session) -> None:
     assert parked_now["pct_asleep_or_offline"] >= 96  # 30 min online, then offline/asleep
 
 
+async def test_timeline_of_days_without_activity_is_one_park(mcp_session) -> None:
+    async with mcp_session(seeds=["stops"]) as session:
+        rows = await _rows(
+            session,
+            "get_timeline",
+            car_name="stopper",
+            start_date="2025-03-04",
+            end_date="2025-03-05",
+        )
+
+    # Nothing happened on these days: the park began three days before them
+    # and ended five days after, at activities outside the window.
+    assert [r["activity"] for r in rows] == ["park"]
+    park = rows[0]
+    assert (park["start_local"], park["end_local"]) == ("2025-03-01 13:00", "2025-03-10 08:00")
+    assert park["location"] == "Home Street 1"
+    assert park["duration_min"] == 12660
+
+
 async def test_timeline_includes_software_updates(mcp_session) -> None:
     async with mcp_session() as session:
         rows = await _rows(session, "get_timeline", car_name="blue")

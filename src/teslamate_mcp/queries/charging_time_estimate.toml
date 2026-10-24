@@ -1,0 +1,94 @@
+name = "get_charging_time_estimate"
+description = "How long will the charging stop take? Estimates the minutes a charge from one battery % to another takes, from the time this car's own past sessions spent at each battery percent, so the taper near the top and AC losses are already in it. One row per car and charger type (supercharger, other_dc for third-party fast chargers, ac): the typical minutes (median per percent), a slow figure (90th percentile per percent, which fits a cold battery or a busy site), the kWh added, the average power, the sessions behind it, and the battery band the history covers. minutes is null when some percent between start and target has no history; history_soc_from and history_soc_to say what it does cover. start_soc defaults to the latest recorded battery level. The ac row blends every AC charger the car used, slow and fast alike: pass location to get one charger. Pair with get_trip_energy_estimate to plan a stop."
+
+[[params]]
+name = "start_soc"
+type = "integer"
+description = "Battery % when charging starts. Omit to use the latest recorded battery level."
+minimum = 0
+maximum = 99
+
+[[params]]
+name = "target_soc"
+type = "integer"
+description = "Battery % to charge to."
+default = 80
+minimum = 1
+maximum = 100
+
+[[params]]
+name = "charger_type"
+type = "string"
+description = "any for a row per charger type, dc for both kinds of fast charger, supercharger for Tesla Superchargers only, other_dc for third-party fast chargers only, ac for AC charging only."
+default = "any"
+enum = ["any", "dc", "supercharger", "other_dc", "ac"]
+
+[[params]]
+name = "location"
+type = "string"
+description = "Case-insensitive substring matched against the session's address, city, and geofence name, to base the estimate on one charger or place."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days of charging history to learn from."
+default = 730
+minimum = 30
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "charger_type"
+type = "string"
+description = "supercharger, other_dc, or ac."
+
+[[output]]
+name = "start_soc"
+type = "integer"
+description = "Battery % the estimate starts from."
+
+[[output]]
+name = "target_soc"
+type = "integer"
+
+[[output]]
+name = "minutes"
+type = "number"
+description = "Typical time for the charge; null when the history does not cover every percent on the way."
+
+[[output]]
+name = "minutes_slow"
+type = "number"
+description = "The same from the 90th percentile time at each percent."
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+description = "Energy the charge adds to the battery, from the kWh per percent of past sessions."
+
+[[output]]
+name = "avg_power_kw"
+type = "number"
+description = "Energy added over the typical time."
+
+[[output]]
+name = "sessions_used"
+type = "integer"
+
+[[output]]
+name = "history_soc_from"
+type = "integer"
+description = "Lowest battery % the past sessions charged from."
+
+[[output]]
+name = "history_soc_to"
+type = "integer"
+description = "Highest battery % the past sessions charged to."

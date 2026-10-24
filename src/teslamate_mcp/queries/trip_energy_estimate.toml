@@ -1,5 +1,5 @@
 name = "get_trip_energy_estimate"
-description = "Will I make it? Estimates the energy and battery a drive of a given distance will take, from this car's own driving history rather than the EPA/WLTP figure. Consumption comes from past drives at a similar outside temperature (within 3°C, widening to 6°C, 10°C, then all temperatures until there are at least 5 drives and 50 km to go on); highway=true uses only long drives averaging 70 km/h or more, which fits motorway trips. Returns, per car: the expected and a conservative (90th percentile) Wh/km, energy needed in kWh, usable battery capacity and full-battery range, the starting battery % (the latest recorded one unless start_soc is given, with its timestamp), battery % needed, and battery % on arrival. A negative arrival % means a charging stop is needed. Get the distance from a maps or routing tool when the user names a destination; elevation and wind are not modeled, so keep a margin on mountain routes."
+description = "Will I make it? Estimates the energy and battery a drive of a given distance will take, from this car's own driving history rather than the EPA/WLTP figure. Consumption comes from past drives at a similar outside temperature (within 3°C, widening to 6°C, 10°C, then all temperatures until there are at least 5 drives and 50 km to go on); highway=true uses only long drives averaging 70 km/h or more, which fits motorway trips; avg_speed_kmh uses only drives that averaged within 15 km/h of the journey's expected average speed, which is finer (take it from a routing tool's distance and duration). Returns, per car: the expected and a conservative (90th percentile) Wh/km, energy needed in kWh, usable battery capacity and full-battery range, the starting battery % (the latest recorded one unless start_soc is given, with its timestamp), battery % needed, and battery % on arrival. A negative arrival % means a charging stop is needed. Get the distance from a maps or routing tool when the user names a destination; elevation and wind are not modeled, so keep a margin on mountain routes."
 
 [[params]]
 name = "distance_km"
@@ -28,6 +28,13 @@ name = "highway"
 type = "boolean"
 description = "Base the estimate on long drives averaging at least 70 km/h (motorway driving)."
 default = false
+
+[[params]]
+name = "avg_speed_kmh"
+type = "number"
+description = "Expected average speed of the whole drive in km/h: distance divided by duration from a routing tool, not the cruise setting. Uses only past drives that averaged within 15 km/h of it; when drives_used comes back low there is too little history at that speed, so leave it out."
+minimum = 10
+maximum = 200
 
 [[params]]
 name = "car_name"
@@ -62,6 +69,11 @@ description = "Which past drives the consumption came from, by temperature."
 [[output]]
 name = "highway"
 type = "boolean"
+
+[[output]]
+name = "avg_speed_kmh"
+type = "number"
+description = "The average speed the estimate was narrowed to; null when not given."
 
 [[output]]
 name = "drives_used"

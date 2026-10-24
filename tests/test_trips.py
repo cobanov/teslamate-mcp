@@ -54,6 +54,22 @@ async def test_stop_limits_decide_where_trips_split(mcp_session) -> None:
     assert [(t["trip_id"], t["legs"]) for t in shorter] == [(105, 1), (104, 1), (103, 1), (101, 2)]
 
 
+async def test_charging_counts_only_when_it_starts_inside_the_stop(mcp_session) -> None:
+    async with mcp_session(seeds=["stops"]) as session:
+        trips = await _rows(session, "get_trips", car_name="stopper")
+        joined = await _rows(session, "get_trip_details", trip_id=701)
+
+    # Every stop is 60 minutes: over the plain limit, under the charging one.
+    assert [(t["trip_id"], t["legs"], t["charging_stops"]) for t in trips] == [
+        (705, 1, 0),
+        (704, 1, 0),  # the session before this stop started before drive 703 ended
+        (703, 1, 0),  # a session that starts with the drive is not in the stop before it
+        (701, 2, 1),  # a session that starts as the drive before ends is
+    ]
+    assert [r["drive_id"] for r in joined if r["kind"] == "drive"] == [701, 702]
+    assert "charging_stop" in [r["kind"] for r in joined]
+
+
 async def test_trip_filters(mcp_session) -> None:
     async with mcp_session(with_trips=True) as session:
         via_bolu = await _rows(session, "get_trips", car_name=_CAR, location="bolu")

@@ -1176,7 +1176,7 @@ wheels = [
 
 [[package]]
 name = "teslamate-mcp"
-version = "0.13.5"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

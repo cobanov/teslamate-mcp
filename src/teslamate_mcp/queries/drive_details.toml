@@ -1,5 +1,5 @@
 name = "get_drive_details"
-description = "Full statistics for one specific drive by its drive_id (find ids with search_drives): timestamps, distance km, duration, average/max speed, power extremes, inside/outside temperature °C, ascent and descent m, odometer start/end, rated range used km, range-based consumption %, and start/end locations."
+description = "Full statistics for one specific drive by its drive_id (find ids with search_drives): timestamps, distance km, duration, average/max speed, power extremes, inside/outside temperature °C, ascent and descent m, odometer start/end, rated and ideal range used km, range-based consumption %, start/end locations, start/end geo-fence names, and the energy the motors used and regenerative braking recovered (kWh, from the power samples)."
 
 [[params]]
 name = "drive_id"
@@ -103,3 +103,40 @@ description = "Total climb in meters (GPS elevation noise inflates it; ascent_m 
 [[output]]
 name = "descent_m"
 type = "integer"
+
+[[output]]
+name = "start_ideal_range_km"
+type = "number"
+
+[[output]]
+name = "end_ideal_range_km"
+type = "number"
+
+[[output]]
+name = "ideal_range_used_km"
+type = "number"
+
+[[output]]
+name = "start_geofence"
+type = "string"
+description = "Geo-fence TeslaMate stored at the start of the drive. Null outside every fence."
+
+[[output]]
+name = "end_geofence"
+type = "string"
+description = "Geo-fence TeslaMate stored at the end of the drive. Null outside every fence."
+
+[[output]]
+name = "energy_used_kwh"
+type = "number"
+description = "Energy drawn from the battery while the power was positive, integrated from the power samples. Null when the drive has no power samples."
+
+[[output]]
+name = "energy_recovered_kwh"
+type = "number"
+description = "Energy regenerative braking put back into the battery (negative power samples)."
+
+[[output]]
+name = "regen_share_pct"
+type = "number"
+description = "energy_recovered_kwh as a percent of energy_used_kwh."

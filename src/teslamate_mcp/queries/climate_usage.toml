@@ -1,0 +1,70 @@
+name = "get_climate_usage"
+description = "Monthly totals of the climate running while the car was parked, per car: sessions (and how many were preconditioning before a drive, and how many were cooling), hours, hours plugged in, estimated battery energy, its estimated cost at that month's average recorded price per kWh, and the average outside temperature. Sessions are built as in get_parked_climate_sessions, so hours and energy are estimates from TeslaMate's polled samples. Climate energy used while driving is not separable from the drive's consumption and is not included. Months are local (REPORT_TIMEZONE), newest first; months without sessions are left out."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "months"
+type = "integer"
+description = "How many months back, counting the current one."
+default = 12
+minimum = 1
+maximum = 120
+
+[[params]]
+name = "min_minutes"
+type = "integer"
+description = "Only count sessions at least this many minutes long. 0 includes the brief blips around getting in and out."
+default = 3
+minimum = 0
+maximum = 1440
+
+[[output]]
+name = "month"
+type = "string"
+description = "Local month, YYYY-MM."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "before_drive_sessions"
+type = "integer"
+description = "Sessions that ended within 5 minutes of a drive: preconditioning."
+
+[[output]]
+name = "cooling_sessions"
+type = "integer"
+description = "Sessions where it was warmer outside than the set temperature."
+
+[[output]]
+name = "hours"
+type = "number"
+
+[[output]]
+name = "plugged_in_hours"
+type = "number"
+description = "Part of the hours with a charging session running; the grid supplied that energy."
+
+[[output]]
+name = "energy_kwh"
+type = "number"
+description = "Estimated battery energy while unplugged."
+
+[[output]]
+name = "estimated_cost"
+type = "number"
+description = "energy_kwh at the month's average recorded price per billed kWh; null when no charging session that month has a recorded cost."
+
+[[output]]
+name = "avg_outside_temp"
+type = "number"
+description = "Time-weighted outside temperature during the sessions, °C."

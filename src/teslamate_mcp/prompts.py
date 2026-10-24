@@ -46,8 +46,8 @@ def register_prompts(mcp: MCPServer) -> None:
             "2. Call `get_daily_driving_patterns` (same `days`) to identify usage "
             "peaks by day of week.\n"
             "3. Call `get_trips` for the journeys in the window (a journey with "
-            "stops is several drives in TeslaMate), or `search_drives` for single "
-            "drives.\n"
+            "stops is several drives in TeslaMate), `get_frequent_routes` for the "
+            "routes driven again and again, or `search_drives` for single drives.\n"
             "4. Produce a short report: total distance, average drive length, "
             "peak day, most-used time slot, the longest journeys, and any notable "
             "outliers."
@@ -66,7 +66,9 @@ def register_prompts(mcp: MCPServer) -> None:
             "`get_fast_charging_by_location` for how fast each fast charger was.\n"
             "3. Call `get_charging_costs` with group_by='month' and again with "
             "group_by='location'. If sessions_without_cost is not zero, call "
-            "`get_charging_cost_estimates` so the totals are not understated.\n"
+            "`get_charging_cost_estimates` so the totals are not understated. Call "
+            "`get_cost_per_distance` for the AC and DC price and the cost per 100 km, "
+            "and `get_charging_hours` for when the car charges.\n"
             "4. Highlight: home-vs-public split, kWh added per location, cost per "
             "kWh trends, and any session that looks unusually slow or expensive. "
             "For suspicious sessions, call `show_charging_curve_comparison` with "
@@ -80,7 +82,9 @@ def register_prompts(mcp: MCPServer) -> None:
     async def find_anomalies() -> str:
         return (
             "Look for anomalies in the recorded data:\n"
-            "1. Call `get_unusual_power_consumption` to fetch flagged events.\n"
+            "1. Call `get_health_checks` for anything already flagged (logging, "
+            "tires, parked drain, sleep, battery), and `get_unusual_power_consumption` "
+            "for drives that used too much.\n"
             "2. Call `get_efficiency_by_month_and_temperature` and "
             "`get_average_efficiency_by_temperature` to see whether the "
             "anomalies correlate with weather.\n"
@@ -123,9 +127,12 @@ def register_prompts(mcp: MCPServer) -> None:
             "3. Call `get_software_update_history` for the installed firmware and "
             "when it arrived. TeslaMate does not record whether an update is "
             "waiting, so do not claim one is or is not.\n"
-            "4. Present a single short paragraph: what the car is doing and since "
+            "4. Call `get_health_checks` and keep the rows whose status is alert "
+            "or warn.\n"
+            "5. Present a single short paragraph: what the car is doing and since "
             "when, where it is, battery level, climate state, and firmware. If "
-            "last_update is old, say that TeslaMate has lost contact with the car."
+            "last_update is old, say that TeslaMate has lost contact with the car. "
+            "End with the alerts and warnings, one line each, or say none."
         )
 
     @mcp.prompt(
@@ -159,15 +166,18 @@ def register_prompts(mcp: MCPServer) -> None:
         )
         return (
             f"Plan a drive to {destination}. {temp}\n"
-            "1. Get the driving distance from a maps or routing tool; ask the user "
-            "for it if none is available.\n"
+            "1. Get the driving distance, and the duration if there is one, from a "
+            "maps or routing tool; ask the user for the distance if none is "
+            "available.\n"
             "2. Call `get_trip_energy_estimate` with distance_km and outside_temp_c, "
-            "and highway=true for a motorway route.\n"
+            "plus avg_speed_kmh (distance over duration) when the duration is known, "
+            "or highway=true for a motorway route when it is not.\n"
             "3. For a hilly route, call `get_efficiency_by_elevation` and adjust "
             "the estimate by the uphill or downhill difference.\n"
             "4. If the conservative arrival battery % is below about 10%, suggest "
             "where to charge: `get_fast_charging_by_location` shows fast chargers "
-            "the car has used and how fast they were.\n"
+            "the car has used and how fast they were, and "
+            "`get_charging_time_estimate` how long the stop will take.\n"
             "5. Answer plainly: expected and conservative arrival %, whether a "
             "stop is needed, and how much margin is left."
         )
@@ -197,17 +207,39 @@ def register_prompts(mcp: MCPServer) -> None:
     async def monthly_recap(month: str = "this month") -> str:
         return (
             f"Recap {month}:\n"
-            "1. Call `show_activity_report` with period='month' and the year and "
-            "month meant (leave them out for the current month).\n"
-            "2. Call `get_period_comparison` with days=30 for the change against "
-            "the 30 days before (for a past month, compare two "
-            "`get_activity_report` calls instead).\n"
-            "3. Call `get_visited_places` with days=31 for where the car went and "
-            "`get_charging_costs` with a start_date and end_date covering the "
-            "month for what charging cost.\n"
-            "4. Write a short recap: distance and drives, consumption and what "
-            "drove it (temperature, trips), energy charged and cost, the busiest "
-            "day, and the places visited most."
+            "1. Call `show_recap` with period='month' and the year and month meant "
+            "(leave them out for the current month) for the totals, the change "
+            "against the month before, and the highlights.\n"
+            "2. Call `get_activity_report` with the same period for the day-by-day "
+            "picture behind them.\n"
+            "3. Call `get_climate_usage` with months=1 (more for a past month) for "
+            "the climate run while parked.\n"
+            "4. Write a short recap: distance and drives and how that compares, "
+            "consumption and what drove it (temperature, trips, climate), energy "
+            "charged and cost, the busiest day, the longest drive, and the places "
+            "visited most."
+        )
+
+    @mcp.prompt(
+        name="year_in_review",
+        description="A year in review ('Wrapped'): totals, highlights, and records.",
+    )
+    async def year_in_review(year: str = "this year") -> str:
+        return (
+            f"Review {year}:\n"
+            "1. Call `show_recap` with period='year' and the year meant (leave it "
+            "out for the current year) for the totals, the change against the "
+            "year before, and the highlights.\n"
+            "2. Call `get_activity_report` with period='year' for the month by "
+            "month picture: the busiest and quietest months, and how consumption "
+            "followed the seasons.\n"
+            "3. Call `get_climate_usage` with months=12 for the climate run while "
+            "parked.\n"
+            "4. Write it like a year-end wrap-up: the headline distance and how it "
+            "compares, the longest drive and where it went, the favourite "
+            "destination and charging spot, the most efficient month, the "
+            "temperature extremes, and what charging cost. If the year is still "
+            "running, say so."
         )
 
     @mcp.prompt(

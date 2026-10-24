@@ -31,6 +31,7 @@ _EXPECTED_PROMPTS = {
     "plan_trip",
     "review_trip",
     "monthly_recap",
+    "year_in_review",
     "charging_costs_and_savings",
 }
 

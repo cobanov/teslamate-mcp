@@ -1,0 +1,60 @@
+name = "get_projected_range_by_mileage"
+description = "Battery range against distance driven, like TeslaMate's Projected Range dashboard: the rated range at 100 % in odometer buckets (1000 km by default), per car, with the median, lowest, and highest reading, the number of charges behind it, the percent below the car's best bucket, and the dates the bucket spans. Each reading is a charge that ended at 50 % or more, scaled to 100 %. Use it to see degradation per km rather than per month (get_battery_degradation_over_time). Optional filters: car_name, bucket_km."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "bucket_km"
+type = "integer"
+description = "Width of an odometer bucket in km."
+default = 1000
+minimum = 100
+maximum = 50000
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "odometer_from_km"
+type = "integer"
+
+[[output]]
+name = "odometer_to_km"
+type = "integer"
+
+[[output]]
+name = "charges"
+type = "integer"
+description = "Charges behind the bucket's numbers; one or two make a rough reading."
+
+[[output]]
+name = "range_at_100_km"
+type = "number"
+description = "Median rated range at 100 %."
+
+[[output]]
+name = "min_range_at_100_km"
+type = "number"
+
+[[output]]
+name = "max_range_at_100_km"
+type = "number"
+
+[[output]]
+name = "vs_best_pct"
+type = "number"
+description = "range_at_100_km against the car's highest bucket, in percent (0 or negative)."
+
+[[output]]
+name = "first_date"
+type = "string"
+description = "Local date of the bucket's first charge, YYYY-MM-DD."
+
+[[output]]
+name = "last_date"
+type = "string"
+description = "Local date of the bucket's last charge, YYYY-MM-DD."

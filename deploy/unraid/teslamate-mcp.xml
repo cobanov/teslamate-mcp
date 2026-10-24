@@ -11,8 +11,8 @@
   <Overview>
     Model Context Protocol (MCP) server that exposes your TeslaMate PostgreSQL database
     to AI assistants (Claude, Cursor, ...) over streamable HTTP.
-    57 tools (47 predefined analytics queries + run_sql + get_database_schema +
-    8 interactive MCP Apps charts), 11 prompts, resources.
+    77 tools (65 predefined analytics queries + run_sql + get_database_schema +
+    10 interactive MCP Apps charts), 12 prompts, resources.
 
     Requires a running TeslaMate + PostgreSQL stack.
     Endpoint: http://[IP]:[PORT:8888]/mcp - Health: http://[IP]:[PORT:8888]/health
@@ -45,7 +45,7 @@
           Description="Optional. Application Audience (AUD) tag of the Cloudflare Access application protecting the direct hostname. Set together with CF_ACCESS_TEAM_DOMAIN."
           Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="MAP_TILES" Target="MAP_TILES" Default="true" Mode=""
-          Description="Draw a low-detail basemap (Esri gray canvas tiles) under the route, trip, and places maps. Tiles are fetched by the viewer's browser and reveal the rough area viewed; set false to keep the maps fully offline."
+          Description="Draw an interactive basemap (CARTO vector tiles; Esri raster tiles where the client cannot run it) under the route, trip, places, and roads maps. Tiles are fetched by the viewer's browser and reveal the rough area viewed; set false to keep the maps fully offline."
           Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
   <Config Name="LOG_LEVEL" Target="LOG_LEVEL" Default="INFO" Mode=""
           Description="Python log level (DEBUG, INFO, WARNING, ERROR)."
