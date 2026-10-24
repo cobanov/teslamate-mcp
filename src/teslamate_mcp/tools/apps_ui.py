@@ -288,6 +288,24 @@ APP_SPECS: tuple[AppSpec, ...] = (
             "year or month in review, a wrap-up, or 'Wrapped'."
         ),
     ),
+    AppSpec(
+        tool_name="show_driven_roads",
+        query_name="get_driven_roads",
+        base_uri="ui://teslamate/driven-roads.html",
+        html_file="driven_roads.html",
+        resource_name="driven_roads_map",
+        resource_title="Driven roads map",
+        resource_description="Map of every road the car has driven.",
+        tool_description=(
+            "Render a map of every road the car has driven, displayed directly in "
+            "the conversation: all drive paths drawn as one network, a route "
+            "driven many times drawn once (the newest drive between each pair of "
+            "places), the number of routes and the distance they cover, and a "
+            "table per car. Returns the same rows as get_driven_roads, so it also "
+            "works as a plain data tool. Prefer this when the user wants to SEE "
+            "where the car has been driven."
+        ),
+    ),
 )
 
 CHARGING_CURVE_APP_URI = APP_SPECS[0].uri

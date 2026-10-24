@@ -10,11 +10,41 @@ SELECT d.id AS drive_id,
     end_addr.display_name AS end_location,
     end_addr.city AS end_city,
     d.outside_temp_avg,
-    (d.start_rated_range_km - d.end_rated_range_km) AS rated_range_used_km
+    (d.start_rated_range_km - d.end_rated_range_km) AS rated_range_used_km,
+    ROUND(w.wh_per_km::numeric) AS wh_per_km,
+    ROUND(x.expected_wh_per_km::numeric) AS expected_wh_per_km,
+    ROUND((100 * (w.wh_per_km / NULLIF(x.expected_wh_per_km, 0) - 1))::numeric, 1)
+        AS vs_expected_pct,
+    x.basis_drives AS expected_basis_drives
 FROM drives d
     JOIN cars c ON d.car_id = c.id
     LEFT JOIN addresses start_addr ON d.start_address_id = start_addr.id
     LEFT JOIN addresses end_addr ON d.end_address_id = end_addr.id
+    -- Consumption on the rated-range scale the other drive tools use.
+    CROSS JOIN LATERAL (
+        SELECT CASE WHEN d.distance >= 1 THEN
+                (d.start_rated_range_km - d.end_rated_range_km) * c.efficiency * 1000 / d.distance
+            END AS wh_per_km
+    ) w
+    -- What this car usually uses in the same weather: the median of its other
+    -- drives of 5 km or more within 3 °C of this one's outside temperature,
+    -- leaving out range recalibrations as get_drive_efficiency_points does.
+    LEFT JOIN LATERAL (
+        SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY o.wh) AS expected_wh_per_km,
+            COUNT(*) AS basis_drives
+        FROM (
+            SELECT (o.start_rated_range_km - o.end_rated_range_km) * c.efficiency * 1000
+                    / o.distance AS wh
+            FROM drives o
+            WHERE o.car_id = d.car_id
+                AND o.id <> d.id
+                AND o.end_date IS NOT NULL
+                AND o.distance >= 5
+                AND ABS(o.outside_temp_avg - d.outside_temp_avg) <= 3
+        ) o
+        WHERE o.wh BETWEEN 50 AND 600
+        HAVING COUNT(*) >= 3
+    ) x ON w.wh_per_km IS NOT NULL
 WHERE (%(car_name)s::text IS NULL OR c.name ILIKE '%%' || %(car_name)s || '%%')
     AND (%(start_date)s::date IS NULL
         OR ((d.start_date AT TIME ZONE 'UTC') AT TIME ZONE %(tz)s::text)::date >= %(start_date)s::date)

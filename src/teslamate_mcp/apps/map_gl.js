@@ -1,5 +1,5 @@
 "use strict";
-/* Shared MapLibre layer for the map views (drive, trip, places): CARTO's
+/* Shared MapLibre layer for the map views (drive, trip, places, roads): CARTO's
    vector basemap in the client's theme, zoom and fit controls, route lines,
    and HTML markers. The server inlines this and the MapLibre bundle; with
    MAP_TILES off neither is inlined and the views draw their SVG map. */
@@ -122,10 +122,11 @@ const TeslaMateMap = (() => {
       lines.forEach((line, i) => {
         const id = "tm-route-" + i;
         if (map.getSource(id)) return;
-        map.addSource(id, {
-          type: "geojson",
-          data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: line.coordinates } },
-        });
+        // Many paths share one source and layer: a layer each would slow the map.
+        const geometry = line.multi
+          ? { type: "MultiLineString", coordinates: line.coordinates }
+          : { type: "LineString", coordinates: line.coordinates };
+        map.addSource(id, { type: "geojson", data: { type: "Feature", properties: {}, geometry } });
         map.addLayer({
           id, type: "line", source: id,
           layout: { "line-join": "round", "line-cap": "round" },
@@ -156,6 +157,10 @@ const TeslaMateMap = (() => {
       },
       line(coordinates, width) {
         lines.push({ coordinates, width });
+        if (styled) drawLines();
+      },
+      lines(paths, width) {
+        lines.push({ coordinates: paths, width, multi: true });
         if (styled) drawLines();
       },
       marker(lngLat, className, label) {

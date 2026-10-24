@@ -1,0 +1,78 @@
+name = "get_cost_per_distance"
+description = "What driving costs, per local month and car: distance driven, charging sessions, kWh added split into AC and DC, recorded cost, the average price per kWh for AC, DC, and overall (over the sessions that have a cost), cost per 100 km, and kWh charged per 100 km. Newest month first. Optional filters: car_name, days. sessions_without_cost > 0 means cost and cost_per_100km undercount; get_charging_cost_estimates prices those sessions."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "month"
+type = "string"
+description = "Local calendar month, YYYY-MM."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "sessions_without_cost"
+type = "integer"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "ac_kwh"
+type = "number"
+
+[[output]]
+name = "dc_kwh"
+type = "number"
+
+[[output]]
+name = "cost"
+type = "number"
+description = "Recorded cost, in the currency configured in TeslaMate. Null when no session has one."
+
+[[output]]
+name = "ac_cost_per_kwh"
+type = "number"
+description = "Average price of AC charging (home, destination) over the AC sessions with a cost."
+
+[[output]]
+name = "dc_cost_per_kwh"
+type = "number"
+description = "Average price of DC fast charging over the DC sessions with a cost."
+
+[[output]]
+name = "cost_per_kwh"
+type = "number"
+description = "Average price over all sessions with a cost."
+
+[[output]]
+name = "cost_per_100km"
+type = "number"
+description = "Recorded cost per 100 km driven that month."
+
+[[output]]
+name = "kwh_charged_per_100km"
+type = "number"
+description = "Energy added per 100 km driven that month. Charging and driving rarely balance inside one month, so read it over several."

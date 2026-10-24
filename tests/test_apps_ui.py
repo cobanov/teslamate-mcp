@@ -37,9 +37,15 @@ _APP_ARGS = {
     "show_visited_places": {},
     "show_efficiency_vs_temperature": {},
     "show_recap": {},  # always one row, even for a quiet period
+    "show_driven_roads": {},  # drive 4's seeded track
 }
 # Views that draw a basemap.
-_MAP_VIEWS = {"show_drive_route", "show_trip_route", "show_visited_places"}
+_MAP_VIEWS = {
+    "show_drive_route",
+    "show_trip_route",
+    "show_visited_places",
+    "show_driven_roads",
+}
 # What a map view declares to the host: the vector basemap MapLibre fetches,
 # and the raster tiles of the SVG fallback.
 _MAP_CSP_META = {

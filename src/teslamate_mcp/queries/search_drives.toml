@@ -1,5 +1,5 @@
 name = "search_drives"
-description = "Search individual drives (trips) with flexible filters: date range (local calendar dates), car, distance bounds (km), and free-text location match against start/end address or city. Returns drive_id (usable with get_drive_details), timestamps, distance km, duration, max speed, locations, and rated range used. Newest first by default; 50 rows max by default."
+description = "Search individual drives (trips) with flexible filters: date range (local calendar dates), car, distance bounds (km), and free-text location match against start/end address or city. Returns drive_id (usable with get_drive_details), timestamps, distance km, duration, max speed, locations, rated range used, and consumption in Wh/km against what this car usually uses at the same outside temperature (vs_expected_pct: positive means it used more). Newest first by default; 50 rows max by default."
 
 [[params]]
 name = "car_name"
@@ -99,3 +99,23 @@ type = "number"
 [[output]]
 name = "rated_range_used_km"
 type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Consumption: rated range used x the car's efficiency, per km. Null under 1 km."
+
+[[output]]
+name = "expected_wh_per_km"
+type = "number"
+description = "This car's median consumption over its other drives of 5 km or more within 3 °C of this drive's outside temperature. Null with fewer than 3 such drives."
+
+[[output]]
+name = "vs_expected_pct"
+type = "number"
+description = "wh_per_km against expected_wh_per_km, in percent. Above +20 is a costly drive for the weather (speed, climbing, short hops, heating); below -15 an easy one. Short drives swing widely."
+
+[[output]]
+name = "expected_basis_drives"
+type = "integer"
+description = "How many drives expected_wh_per_km rests on."

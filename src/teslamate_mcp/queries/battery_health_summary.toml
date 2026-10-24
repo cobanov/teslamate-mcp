@@ -1,5 +1,5 @@
 name = "get_battery_health_summary"
-description = "Latest battery snapshot per car: battery level and usable battery level (%), rated/ideal/estimated range (km), and battery health as the rated-to-ideal range ratio (%). Optional filters: car_name."
+description = "Latest battery snapshot per car: battery level and usable battery level (%), rated/ideal/estimated range (km), battery health as the rated-to-ideal range ratio (%), the rated range at 100 % from recent charges, the usable capacity estimated from long charges (kWh), lifetime AC and DC energy added (kWh), and the charge cycles (lifetime energy added / estimated capacity). Optional filters: car_name. get_battery_capacity_trend has the capacity per month."
 
 [[params]]
 name = "car_name"
@@ -33,3 +33,33 @@ type = "number"
 [[output]]
 name = "battery_health_pct"
 type = "number"
+
+[[output]]
+name = "range_at_100_km"
+type = "number"
+description = "Rated range at a full battery: the median over the five newest charges that ended at 50 % or more, scaled to 100 %."
+
+[[output]]
+name = "est_capacity_kwh"
+type = "number"
+description = "Usable battery capacity: median energy added per percent gained over the ten newest charges that gained 40 points or more. Null with no such charge."
+
+[[output]]
+name = "capacity_sessions"
+type = "integer"
+description = "How many charges the capacity estimate rests on (at most 10); fewer than 3 makes it rough."
+
+[[output]]
+name = "ac_energy_added_kwh"
+type = "number"
+description = "Lifetime energy added on AC (home, destination) charging."
+
+[[output]]
+name = "dc_energy_added_kwh"
+type = "number"
+description = "Lifetime energy added on DC fast charging (Supercharger and third-party)."
+
+[[output]]
+name = "charge_cycles"
+type = "number"
+description = "Equivalent full cycles: lifetime energy added divided by est_capacity_kwh."

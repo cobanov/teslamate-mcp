@@ -59,7 +59,7 @@ CREATE TABLE cars (id SMALLINT PRIMARY KEY, name TEXT, model TEXT, trim_badging 
     exterior_color TEXT, marketing_name TEXT, settings_id BIGINT REFERENCES car_settings(id),
     efficiency DOUBLE PRECISION);
 CREATE TABLE addresses (id BIGINT PRIMARY KEY, display_name TEXT, city TEXT, state TEXT,
-    latitude DOUBLE PRECISION, longitude DOUBLE PRECISION);
+    latitude DOUBLE PRECISION, longitude DOUBLE PRECISION, country TEXT);
 CREATE TABLE geofences (id BIGINT PRIMARY KEY, name TEXT, latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION, radius SMALLINT, cost_per_unit NUMERIC,
     session_fee NUMERIC, billing_type TEXT);
@@ -112,9 +112,9 @@ INSERT INTO car_settings (id) VALUES (1), (2);
 INSERT INTO cars VALUES (1, 'Blue Thunder', 'model3', 'LR', 'DeepBlue', 'Model 3 LR', 1, 0.15),
                         (2, 'Red Rocket', 'modely', 'P', 'Red', 'Model Y P', 2, 0.16);
 INSERT INTO addresses VALUES
-    (1, 'Home Street 1', 'Istanbul', 'TR-34', 41.0, 29.0),
-    (2, 'Office Plaza', 'Istanbul', 'TR-34', 41.1, 29.1),
-    (3, 'Supercharger Edirne', 'Edirne', 'TR-22', 41.7, 26.6);
+    (1, 'Home Street 1', 'Istanbul', 'TR-34', 41.0, 29.0, 'Turkey'),
+    (2, 'Office Plaza', 'Istanbul', 'TR-34', 41.1, 29.1, 'Turkey'),
+    (3, 'Supercharger Edirne', 'Edirne', 'TR-22', 41.7, 26.6, 'Turkey');
 INSERT INTO drives (car_id, start_date, end_date, distance, duration_min, speed_max, power_max,
     power_min, start_km, end_km, inside_temp_avg, outside_temp_avg, start_address_id,
     end_address_id, start_rated_range_km, end_rated_range_km) VALUES
@@ -175,10 +175,10 @@ INSERT INTO positions (car_id, date, battery_level, usable_battery_level) VALUES
     (2, now() - interval '40 hours', 85, 84);
 -- Route points inside the fixed TZ-boundary drive (id 4), for get_drive_route.
 INSERT INTO positions (car_id, date, latitude, longitude, battery_level, usable_battery_level,
-    odometer, speed, power, elevation)
+    odometer, speed, power, elevation, drive_id)
 SELECT 1, TIMESTAMP '2026-01-15 22:30:00' + (n * 3 || ' minutes')::interval,
        41.0 + 0.007 * n, 29.0 + 0.005 * n, 80 - n, 79 - n,
-       800.0 + 3.8 * n, 40 + 5 * n, 20 + n, 100 + 10 * n
+       800.0 + 3.8 * n, 40 + 5 * n, 20 + n, 100 + 10 * n, 4
 FROM generate_series(0, 11) AS n;
 UPDATE drives SET ascent = 120, descent = 10,
     start_ideal_range_km = 510.0, end_ideal_range_km = 480.0,
@@ -582,6 +582,124 @@ FROM (VALUES
     ) AS v(ago, km, level);
 """
 
+# Car 17 ("Insight", efficiency 0.15) for the cost, hour, region, odometer,
+# range, style and consumption tools. Base day B is the 10th of last month
+# (UTC); D0 and C0 are 30 days before it, so they land in another month.
+#   D0 1700  B-30d 10:00 home -> office  20 km   10 °C  rated 300 -> 280
+#   D1 1701  B 08:00     home -> office  30 km   20 °C  150 Wh/km, 361 samples
+#   D2 1702  B 18:00     office -> home  30 km   20 °C  150 Wh/km
+#   D3 1703  B+1 08:00   home -> office  30 km   21 °C  180 Wh/km
+#   D4 1704  B+1 18:00   office -> home  30 km   22 °C  150 Wh/km
+#   D5 1705  B+2 08:00   home -> cabin   30 km   19 °C  165 Wh/km
+#   D6 1706  B+2 18:00   cabin -> home   10 km    0 °C  180 Wh/km
+# D1's samples are 5 s apart: 100 kW at n 0-5 and 100-105 (two hard
+# accelerations), -60 kW at n 200-205 (one hard regen), 15 kW otherwise;
+# 130 km/h at n 120-179, 60 km/h otherwise.
+#   C0 1700  B-30d 12:00 office  AC  20 kWh  2.00  50 -> 75 %  rated 390 (520 at 100 %)
+#   C1 1701  B+1 22:00   home    AC  40 kWh  4.00  30 -> 80 %  rated 400 (500)
+#   C2 1702  B+2 12:00   cabin   DC  30 kWh 12.00  20 -> 60 %  rated 300 (500)
+#   C3 1703  B+2 22:00   home    AC  10 kWh  NULL  70 -> 90 %  rated 450 (500)
+_INSIGHTS_SQL = """
+INSERT INTO car_settings (id) VALUES (17);
+INSERT INTO cars VALUES (17, 'Insight', 'model3', 'LR', 'White', 'Model 3 LR', 17, 0.15);
+INSERT INTO addresses VALUES
+    (1701, 'Insight Home', 'Kadikoy', 'Istanbul', 41.0, 29.03, 'Turkey'),
+    (1702, 'Insight Office', 'Besiktas', 'Istanbul', 41.04, 29.0, 'Turkey'),
+    (1703, 'Insight Cabin', 'Volos', 'Thessaly', 39.36, 22.94, 'Greece');
+CREATE TEMP TABLE base AS
+    SELECT date_trunc('month', now() AT TIME ZONE 'UTC') - interval '1 month'
+        + interval '9 days' AS b;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min, speed_max,
+    start_km, end_km, outside_temp_avg, start_address_id, end_address_id,
+    start_rated_range_km, end_rated_range_km)
+SELECT v.id, 17, b + v.at, b + v.at + interval '30 minutes', v.km, 30, v.vmax,
+       v.odo, v.odo + v.km, v.temp, v.from_id, v.to_id, v.r0, v.r1
+FROM base CROSS JOIN (VALUES
+        (1700, interval '-30 days 10 hours', 20.0, 90, 5000.0, 10.0, 1701, 1702, 300.0, 280.0),
+        (1701, interval '8 hours', 30.0, 130, 10000.0, 20.0, 1701, 1702, 400.0, 370.0),
+        (1702, interval '18 hours', 30.0, 90, 10030.0, 20.0, 1702, 1701, 370.0, 340.0),
+        (1703, interval '1 day 8 hours', 30.0, 90, 10060.0, 21.0, 1701, 1702, 340.0, 304.0),
+        (1704, interval '1 day 18 hours', 30.0, 90, 10090.0, 22.0, 1702, 1701, 304.0, 274.0),
+        (1705, interval '2 days 8 hours', 30.0, 90, 10120.0, 19.0, 1701, 1703, 274.0, 241.0),
+        (1706, interval '2 days 18 hours', 10.0, 90, 10150.0, 0.0, 1703, 1701, 241.0, 229.0)
+    ) AS v(id, at, km, vmax, odo, temp, from_id, to_id, r0, r1);
+INSERT INTO positions (car_id, date, latitude, longitude, battery_level, odometer,
+    speed, power, drive_id)
+SELECT 17, b + interval '8 hours' + n * interval '5 seconds',
+       41.0 + 0.0001 * n, 29.03 - 0.0001 * n, 80, 10000.0 + n / 12.0,
+       CASE WHEN n BETWEEN 120 AND 179 THEN 130 ELSE 60 END,
+       CASE WHEN n BETWEEN 0 AND 5 OR n BETWEEN 100 AND 105 THEN 100
+            WHEN n BETWEEN 200 AND 205 THEN -60
+            ELSE 15 END,
+       1701
+FROM base CROSS JOIN generate_series(0, 360) AS n;
+INSERT INTO charging_processes (id, car_id, start_date, end_date, charge_energy_added,
+    duration_min, cost, address_id, start_battery_level, end_battery_level,
+    end_rated_range_km)
+SELECT v.id, 17, b + v.at, b + v.at + interval '1 hour', v.kwh, 60, v.cost, v.addr,
+       v.l0, v.l1, v.rated
+FROM base CROSS JOIN (VALUES
+        (1700, interval '-30 days 12 hours', 20.0, 2.00, 1702, 50, 75, 390.0),
+        (1701, interval '1 day 22 hours', 40.0, 4.00, 1701, 30, 80, 400.0),
+        (1702, interval '2 days 12 hours', 30.0, 12.00, 1703, 20, 60, 300.0),
+        (1703, interval '2 days 22 hours', 10.0, NULL, 1701, 70, 90, 450.0)
+    ) AS v(id, at, kwh, cost, addr, l0, l1, rated);
+INSERT INTO charges (charging_process_id, date, battery_level, charger_power, charger_phases,
+    fast_charger_present)
+SELECT cp.id, cp.start_date, cp.start_battery_level,
+       CASE WHEN cp.id = 1702 THEN 100 ELSE 11 END,
+       CASE WHEN cp.id = 1702 THEN NULL ELSE 3 END,
+       cp.id = 1702
+FROM charging_processes cp
+WHERE cp.car_id = 17;
+DROP TABLE base;
+"""
+
+# Car 18 ("Medic") for get_health_checks, on UTC times like TeslaMate. Its last
+# position is an hour old at 15 %, its front-left tire reads 2.5 bar this week
+# against 2.9 a month ago (the others 2.9 throughout), one drive is open for 3
+# days, and it lost 12 rated km over a 24 h stop between drives A and B. It has
+# been online for the last 30 h, and two charges to 95 % or more sat for days.
+# Rated range at 100 %: 500 km over its first 10 charges, 440 km for the newest.
+_MEDIC_SQL = """
+INSERT INTO car_settings (id) VALUES (18);
+INSERT INTO cars VALUES (18, 'Medic', 'model3', 'LR', 'White', 'Model 3 LR', 18, 0.15);
+CREATE TEMP TABLE base AS SELECT now() AT TIME ZONE 'UTC' AS t;
+INSERT INTO positions (car_id, date, battery_level, ideal_battery_range_km,
+    tpms_pressure_fl, tpms_pressure_fr, tpms_pressure_rl, tpms_pressure_rr)
+SELECT 18, t - v.ago, v.level, 100.0, v.fl, 2.9, 2.9, 2.9
+FROM base CROSS JOIN (VALUES
+        (interval '30 days 1 hour', 60, 2.9),
+        (interval '3 days', 40, 2.5),
+        (interval '1 hour', 15, 2.5)
+    ) AS v(ago, level, fl);
+INSERT INTO states (car_id, state, start_date, end_date)
+SELECT 18, 'online', t - interval '30 hours', NULL FROM base;
+INSERT INTO drives (id, car_id, start_date, end_date, distance, duration_min,
+    start_rated_range_km, end_rated_range_km)
+SELECT v.id, 18, t - v.ago, t - v.ago + v.len, 10.0, 30, v.r0, v.r1
+FROM base CROSS JOIN (VALUES
+        (1801, interval '50 hours 30 minutes', interval '30 minutes', 310.0, 300.0),
+        (1802, interval '26 hours', interval '30 minutes', 288.0, 278.0)
+    ) AS v(id, ago, len, r0, r1);
+INSERT INTO drives (id, car_id, start_date, end_date)
+SELECT 1803, 18, t - interval '3 days', NULL FROM base;
+INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
+    end_battery_level, end_rated_range_km)
+SELECT 18, t - interval '60 days' + n * interval '1 day',
+       t - interval '60 days' + n * interval '1 day' + interval '1 hour', 10.0,
+       80, CASE WHEN n < 10 THEN 400.0 ELSE 352.0 END
+FROM base CROSS JOIN generate_series(0, 14) AS n;
+INSERT INTO charging_processes (car_id, start_date, end_date, charge_energy_added,
+    end_battery_level, end_rated_range_km)
+SELECT 18, t - v.ago - interval '1 hour', t - v.ago, 20.0, v.level, v.rated
+FROM base CROSS JOIN (VALUES
+        (interval '10 days', 100, 440.0),
+        (interval '5 days', 96, 422.4)
+    ) AS v(ago, level, rated);
+DROP TABLE base;
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -593,6 +711,8 @@ _EXTRA_SEEDS = {
     "stops": _STOPS_SQL,
     "status": _STATUS_SQL,
     "gaps": _GAPS_SQL,
+    "insights": _INSIGHTS_SQL,
+    "medic": _MEDIC_SQL,
 }
 
 

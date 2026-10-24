@@ -1,0 +1,88 @@
+name = "get_driving_style"
+description = "How the car is driven, per local month and car, from the power and speed samples: hard accelerations and hard regenerative-braking events per 100 km, the share of moving time above fast_kmh (120 km/h by default), top speed, how much of the energy used regen recovered, and a 0-100 style_score (100 = calm). An event is a run of samples at or past accel_kw (or -regen_kw); samples within 10 s of each other are one event. Newest month first. Compare the months of one car rather than different cars: thresholds suit some motors better than others. Optional filters: car_name, days, accel_kw, regen_kw, fast_kmh. get_efficiency_by_speed shows what speed costs."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look. Long windows read many samples and take longer."
+default = 180
+minimum = 1
+maximum = 1095
+
+[[params]]
+name = "accel_kw"
+type = "integer"
+description = "Power draw in kW that counts as a hard acceleration."
+default = 80
+minimum = 20
+maximum = 500
+
+[[params]]
+name = "regen_kw"
+type = "integer"
+description = "Regenerative power in kW (as a positive number) that counts as hard braking."
+default = 50
+minimum = 10
+maximum = 300
+
+[[params]]
+name = "fast_kmh"
+type = "integer"
+description = "Speed in km/h above which moving time counts as fast. Set it to the motorway limit where you drive."
+default = 120
+minimum = 50
+maximum = 250
+
+[[output]]
+name = "month"
+type = "string"
+description = "Local calendar month, YYYY-MM."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "moving_hours"
+type = "number"
+
+[[output]]
+name = "hard_accel_per_100km"
+type = "number"
+
+[[output]]
+name = "hard_regen_per_100km"
+type = "number"
+description = "Hard regenerative-braking events per 100 km: sudden slowing down."
+
+[[output]]
+name = "over_fast_pct"
+type = "number"
+description = "Percent of moving time above fast_kmh."
+
+[[output]]
+name = "max_speed_kmh"
+type = "integer"
+
+[[output]]
+name = "regen_share_pct"
+type = "number"
+description = "Energy recovered by regen as a percent of energy used. Higher means smoother anticipation and more stop-and-go or downhill driving."
+
+[[output]]
+name = "style_score"
+type = "number"
+description = "100 minus penalties: 0.5 per hard acceleration per 100 km (at most 40), 0.25 per hard regen event per 100 km (at most 30), and 0.5 per percent of moving time above fast_kmh (at most 30). Null under 50 km. A rough guide: 80+ calm, 60-80 typical, below 60 brisk."
