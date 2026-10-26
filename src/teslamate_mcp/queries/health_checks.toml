@@ -1,0 +1,35 @@
+name = "get_health_checks"
+description = "Is anything wrong with the car or its logging? One call runs eight checks per car and returns one row each, worst first, with status alert, warn, ok, or unknown, a value with its unit, and a sentence that explains it: last_data (days since TeslaMate last logged the car), open_records (drives and charges left without an end), tire_pressure (spread between tires and one tire losing more than the others over four weeks, a slow leak), parked_drain (rated km lost per day parked), idle_awake (hours a day awake while parked), full_charge_sits (charges to 95 % or more that then sat 12 h), range_loss (range at 100 % now against the first charges), and battery_level. Windows end at the car's last logged position, so a car TeslaMate lost touch with still gets its last week judged. Start here for 'is everything OK with my car', then follow the tool each detail names. Optional filters: car_name."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "check_name"
+type = "string"
+description = "last_data, open_records, tire_pressure, parked_drain, idle_awake, full_charge_sits, range_loss, or battery_level."
+
+[[output]]
+name = "status"
+type = "string"
+description = "alert, warn, ok, or unknown (not enough data for the check)."
+
+[[output]]
+name = "value"
+type = "number"
+description = "The number the status rests on, in unit. For tire_pressure the larger of the spread and the leak gap."
+
+[[output]]
+name = "unit"
+type = "string"
+
+[[output]]
+name = "detail"
+type = "string"
+description = "What the value means, the numbers behind it, and which tool shows more."

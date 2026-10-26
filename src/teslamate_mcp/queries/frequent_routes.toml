@@ -1,0 +1,133 @@
+name = "get_frequent_routes"
+description = "The routes a car drives again and again, such as a commute: drives grouped by where they start and end, most driven first, with the number of drives, typical (median) distance and duration, the fastest and slowest run and their drive ids, average speed, consumption in Wh/km, total distance, the usual departure hour, and the latest drive. Each direction is its own route. by_departure_hour=true adds a row per local departure hour for each route, which answers 'when should I leave?'. A place is the drive's TeslaMate geofence when it has one, and otherwise an area about twice place_radius_m across, named after the address most drives there resolved to, so parking spots a few metres apart count as one place; a spot on the edge of an area can still split in two, and a geofence in TeslaMate fixes that. Pass a drive id to get_drive_details or show_drive_route to look at one run."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_drives"
+type = "integer"
+description = "Only routes driven at least this many times in the window."
+default = 3
+minimum = 2
+maximum = 1000
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Only drives at least this long; shorter ones are mostly repositioning."
+default = 1.0
+minimum = 0.1
+maximum = 1000
+
+[[params]]
+name = "start_location"
+type = "string"
+description = "Case-insensitive substring matched against the name of the place the route starts from."
+
+[[params]]
+name = "end_location"
+type = "string"
+description = "Case-insensitive substring matched against the name of the place the route ends at."
+
+[[params]]
+name = "place_radius_m"
+type = "integer"
+description = "How far apart two parking spots can be and still count as one place, roughly, in metres. Raise it when a route splits across neighbouring spots."
+default = 250
+minimum = 50
+maximum = 2000
+
+[[params]]
+name = "by_departure_hour"
+type = "boolean"
+description = "Split each route into a row per local departure hour."
+default = false
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of routes returned (each keeps all its hours with by_departure_hour)."
+default = 20
+minimum = 1
+maximum = 100
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_location"
+type = "string"
+
+[[output]]
+name = "end_location"
+type = "string"
+
+[[output]]
+name = "departure_hour"
+type = "integer"
+description = "Local hour the drives left in; null unless by_departure_hour is set."
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "typical_distance_km"
+type = "number"
+description = "Median distance of the drives."
+
+[[output]]
+name = "typical_duration_min"
+type = "number"
+description = "Median duration of the drives."
+
+[[output]]
+name = "fastest_duration_min"
+type = "integer"
+
+[[output]]
+name = "slowest_duration_min"
+type = "integer"
+
+[[output]]
+name = "avg_speed_kmh"
+type = "number"
+
+[[output]]
+name = "wh_per_km"
+type = "number"
+description = "Rated range used x the car's efficiency, over the distance."
+
+[[output]]
+name = "total_distance_km"
+type = "number"
+
+[[output]]
+name = "usual_departure_local"
+type = "string"
+description = "The local hour most of the drives left in, as HH:00."
+
+[[output]]
+name = "fastest_drive_id"
+type = "integer"
+
+[[output]]
+name = "slowest_drive_id"
+type = "integer"
+
+[[output]]
+name = "last_drive"
+type = "string"
+description = "Start of the latest drive on the route (UTC)."

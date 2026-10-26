@@ -1,0 +1,44 @@
+name = "get_odometer_history"
+description = "The odometer over time: per local month and car, the odometer reading at the first and last drive (km), the distance driven, the number of drives, and the days with a drive, oldest month first. Months without a drive are left out. Covers all time by default. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[output]]
+name = "month"
+type = "string"
+description = "Local calendar month, YYYY-MM."
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "odometer_start_km"
+type = "number"
+description = "Odometer at the start of the month's first drive."
+
+[[output]]
+name = "odometer_end_km"
+type = "number"
+description = "Odometer at the end of the month's last drive."
+
+[[output]]
+name = "distance_km"
+type = "number"
+
+[[output]]
+name = "drives"
+type = "integer"
+
+[[output]]
+name = "days_driven"
+type = "integer"

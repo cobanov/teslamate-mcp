@@ -1,0 +1,62 @@
+name = "get_driven_roads"
+description = "Every road the car has driven, for drawing a map: one row per car with the number of routes, their distance, and all their downsampled GPS paths in one compact string. Repeated routes are thinned to the newest drive between each pair of places (either direction), and max_points caps the points over all paths. The paths are bulky and only useful to a map: to SEE the roads use show_driven_roads, and for questions about places use get_regions_visited or get_visited_places. Covers all time by default. Optional filters: car_name, days, min_distance_km, max_points."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "min_distance_km"
+type = "number"
+description = "Leave out drives shorter than this; very short hops add little to the map."
+default = 1.0
+minimum = 0
+maximum = 500
+
+[[params]]
+name = "max_points"
+type = "integer"
+description = "Point budget over all paths, beyond each drive's start and end. More points draw curves more faithfully and return more data."
+default = 2500
+minimum = 200
+maximum = 10000
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "routes"
+type = "integer"
+description = "Drives drawn, one per pair of places."
+
+[[output]]
+name = "distance_km"
+type = "number"
+description = "Total distance of the drives drawn."
+
+[[output]]
+name = "points"
+type = "integer"
+
+[[output]]
+name = "first_drive"
+type = "string"
+description = "UTC start of the oldest drive drawn."
+
+[[output]]
+name = "last_drive"
+type = "string"
+description = "UTC start of the newest drive drawn."
+
+[[output]]
+name = "paths"
+type = "string"
+description = "Drives separated by ';', oldest first; points in a drive separated by spaces. Coordinates are integers in 1e-4 degrees, 'longitude,latitude': a drive's first point is absolute, each later one is the step from the point before."

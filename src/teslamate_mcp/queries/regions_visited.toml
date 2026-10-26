@@ -1,0 +1,66 @@
+name = "get_regions_visited"
+description = "Countries, states (provinces), and cities the car has been to, from the reverse-geocoded addresses where drives ended and charging happened: per region the distinct places, arrivals, charging sessions, and first and last visit (local dates), most visited first. level rolls the list up to countries or states. Answers 'which cities have I driven to' or 'how many provinces has the car seen'. Optional filters: car_name, days. get_visited_places has the individual places with coordinates."
+
+[[params]]
+name = "level"
+type = "string"
+description = "How fine the regions are: country, state (country + state), or city (country + state + city)."
+default = "city"
+enum = ["country", "state", "city"]
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "Restrict to the last N days. Omit for all time."
+minimum = 1
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of regions returned."
+default = 200
+minimum = 1
+maximum = 2000
+
+[[output]]
+name = "country"
+type = "string"
+
+[[output]]
+name = "state"
+type = "string"
+description = "Province or state. Null at level=country, and where the geocoder gave none."
+
+[[output]]
+name = "city"
+type = "string"
+description = "Null at level=country or state, and where the geocoder gave none."
+
+[[output]]
+name = "places"
+type = "integer"
+description = "Distinct addresses visited in the region."
+
+[[output]]
+name = "arrivals"
+type = "integer"
+description = "Drives that ended in the region."
+
+[[output]]
+name = "charging_sessions"
+type = "integer"
+
+[[output]]
+name = "first_visit"
+type = "string"
+description = "Local date, YYYY-MM-DD."
+
+[[output]]
+name = "last_visit"
+type = "string"
+description = "Local date, YYYY-MM-DD."

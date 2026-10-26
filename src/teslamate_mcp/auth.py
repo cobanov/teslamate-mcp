@@ -16,6 +16,9 @@ from __future__ import annotations
 import asyncio
 import hmac
 import logging
+import threading
+import time
+from collections.abc import Callable
 from typing import Any, Protocol
 
 import jwt
@@ -28,9 +31,57 @@ logger = logging.getLogger(__name__)
 
 CF_ACCESS_HEADER = "cf-access-jwt-assertion"
 
+# Seconds between two requests for Cloudflare's key set, at the least.
+_MIN_KEY_FETCH_INTERVAL = 30.0
+
 
 class _SigningKeySource(Protocol):
     def get_signing_key_from_jwt(self, token: str) -> Any: ...
+
+
+class _ThrottledJWKClient(jwt.PyJWKClient):
+    """A PyJWKClient that asks the endpoint for keys at most once per interval.
+
+    PyJWKClient fetches the key set again whenever a token names a `kid` it
+    does not know. The assertion header is read before anything is verified,
+    so without a limit anyone could make the server call Cloudflare once per
+    request by sending tokens with made-up key ids.
+
+    Between fetches the last answer stands: a key Cloudflare has just rotated
+    in is accepted up to one interval late, and after a failed fetch the keys
+    stay unavailable until the interval has passed.
+    """
+
+    def __init__(
+        self,
+        uri: str,
+        *,
+        min_fetch_interval: float = _MIN_KEY_FETCH_INTERVAL,
+        clock: Callable[[], float] = time.monotonic,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(uri, **kwargs)
+        self._min_fetch_interval = min_fetch_interval
+        self._clock = clock
+        self._last_fetch: float | None = None
+        self._last_data: Any = None
+        # Held across the fetch, so requests that arrive together wait for one
+        # answer and do not each start their own.
+        self._fetch_lock = threading.Lock()
+
+    def fetch_data(self) -> Any:
+        with self._fetch_lock:
+            now = self._clock()
+            if self._last_fetch is not None and now - self._last_fetch < self._min_fetch_interval:
+                if self._last_data is None:
+                    raise jwt.PyJWKClientConnectionError(
+                        "The last key fetch failed and it is too soon to try again"
+                    )
+                return self._last_data
+            self._last_fetch = now
+            self._last_data = None
+            self._last_data = super().fetch_data()
+            return self._last_data
 
 
 class CloudflareAccessVerifier:
@@ -46,10 +97,11 @@ class CloudflareAccessVerifier:
         host = team_domain.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
         self.issuer = f"https://{host}"
         self.audience = audience.strip()
-        # PyJWKClient caches the key set and refetches on an unknown `kid`, so
+        # The client caches the key set and refetches on an unknown `kid`, so
         # Cloudflare's periodic key rotation is picked up without a restart.
-        self._keys = jwks_client or jwt.PyJWKClient(
-            f"{self.issuer}/cdn-cgi/access/certs", cache_keys=True, lifespan=3600
+        # The short timeout bounds how long requests wait behind one fetch.
+        self._keys = jwks_client or _ThrottledJWKClient(
+            f"{self.issuer}/cdn-cgi/access/certs", cache_keys=True, lifespan=3600, timeout=10
         )
 
     def verify(self, token: str) -> bool:

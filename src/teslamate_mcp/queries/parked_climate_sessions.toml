@@ -1,0 +1,94 @@
+name = "get_parked_climate_sessions"
+description = "Times the climate ran while the car was parked (preconditioning, cooling it down after arriving, Keep Climate / Dog / Camp mode), newest first, with duration, estimated battery energy, and temperatures. Built from TeslaMate's polled samples, so a session's length and energy are estimates, and climate kept on for under a sampling interval may be missed. Energy is the battery power while unplugged; time plugged in counts toward duration but not energy, since the grid supplies it. kind: before_drive (ended within 5 minutes of the next drive: preconditioning), after_drive (started within 5 minutes of arriving), or parked. Use get_climate_usage for monthly totals."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 30
+minimum = 1
+maximum = 3650
+
+[[params]]
+name = "min_minutes"
+type = "integer"
+description = "Only sessions at least this many minutes long. 0 includes the brief blips around getting in and out."
+default = 3
+minimum = 0
+maximum = 1440
+
+[[params]]
+name = "limit"
+type = "integer"
+description = "Maximum number of rows returned."
+default = 50
+minimum = 1
+maximum = 500
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_date"
+type = "string"
+description = "First climate-on sample (UTC)."
+
+[[output]]
+name = "end_date"
+type = "string"
+description = "Estimated end (UTC): the last sample plus its interval, capped at 10 minutes and at the next drive."
+
+[[output]]
+name = "minutes"
+type = "number"
+
+[[output]]
+name = "kind"
+type = "string"
+description = "before_drive, after_drive, or parked."
+
+[[output]]
+name = "mode"
+type = "string"
+description = "cooling when it was warmer outside than the set temperature, else heating; null without both."
+
+[[output]]
+name = "energy_kwh"
+type = "number"
+description = "Estimated battery energy while unplugged."
+
+[[output]]
+name = "avg_power_kw"
+type = "number"
+description = "energy_kwh over the session's length; lower when part of it was plugged in."
+
+[[output]]
+name = "plugged_in"
+type = "boolean"
+description = "Whether a charging session overlapped it."
+
+[[output]]
+name = "outside_temp"
+type = "number"
+description = "°C"
+
+[[output]]
+name = "inside_temp"
+type = "number"
+description = "°C"
+
+[[output]]
+name = "setpoint"
+type = "number"
+description = "Driver's set temperature, °C."
+
+[[output]]
+name = "location"
+type = "string"
+description = "Geofence name, or the reverse-geocoded address where the car was parked."

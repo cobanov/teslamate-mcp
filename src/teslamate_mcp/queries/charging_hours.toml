@@ -1,0 +1,54 @@
+name = "get_charging_hours"
+description = "When the car charges: charging sessions grouped by the local hour of day they started (0-23), per car, with AC and DC session counts, kWh added, each hour's share of all energy added, average duration, and average starting battery %. Hours without a session are left out. Use it to see whether home charging lands in a cheap night tariff. Optional filters: car_name, days."
+
+[[params]]
+name = "car_name"
+type = "string"
+description = "Case-insensitive substring match on the car's name. Omit for all cars."
+
+[[params]]
+name = "days"
+type = "integer"
+description = "How many days back to look."
+default = 365
+minimum = 1
+maximum = 3650
+
+[[output]]
+name = "car_name"
+type = "string"
+
+[[output]]
+name = "start_hour"
+type = "integer"
+description = "Local hour of day the sessions started, 0-23."
+
+[[output]]
+name = "sessions"
+type = "integer"
+
+[[output]]
+name = "ac_sessions"
+type = "integer"
+
+[[output]]
+name = "dc_sessions"
+type = "integer"
+
+[[output]]
+name = "energy_added_kwh"
+type = "number"
+
+[[output]]
+name = "share_of_energy_pct"
+type = "number"
+description = "This hour's kWh as a percent of the car's kWh over the window."
+
+[[output]]
+name = "avg_duration_min"
+type = "number"
+
+[[output]]
+name = "avg_start_level"
+type = "number"
+description = "Average battery % at the start."

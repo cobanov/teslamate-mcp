@@ -1,0 +1,53 @@
+/* The MapLibre map of the map views, inlined after MapLibre's own stylesheet.
+   Colors come from the view's tokens (.viz-root). */
+.tm-map {
+  height: 360px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--map-bg);
+  font: inherit;
+}
+.tm-ctrl { display: flex; flex-direction: column; gap: 6px; }
+.tm-ctrl-group {
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-1); box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.tm-ctrl-group button {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border: 0; background: none;
+  color: var(--text-primary); cursor: pointer;
+}
+.tm-ctrl-group button + button { border-top: 1px solid var(--border); }
+.tm-ctrl-group button:hover { background: var(--grid); }
+.tm-ctrl-group button:focus-visible { outline: 2px solid var(--route); outline-offset: -2px; }
+.tm-ctrl-group svg { width: 16px; height: 16px; }
+
+.tm-dot {
+  box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid #fff; background: var(--route);
+}
+.tm-dot.start { width: 12px; height: 12px; border-color: var(--text-primary); background: var(--surface-1); }
+.tm-dot.stop { width: 10px; height: 10px; background: var(--marker-stop); }
+.tm-dot.charge { background: var(--marker-charge); }
+.tm-dot.hover {
+  width: 12px; height: 12px; pointer-events: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--route) 30%, transparent);
+}
+.tm-dot.place { cursor: default; }
+.tm-dot.place:hover, .tm-dot.place:focus-visible {
+  z-index: 1; outline: 2px solid var(--text-primary); outline-offset: 1px;
+}
+
+.tm-map .maplibregl-ctrl-attrib {
+  background: var(--surface-1); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.tm-map .maplibregl-ctrl-attrib a { color: var(--text-secondary); }
+.tm-map .maplibregl-ctrl-attrib a:hover { color: var(--text-primary); }
+.tm-map .maplibregl-ctrl-attrib-button { background-color: transparent; filter: invert(var(--icon-invert)); }
+.tm-map .maplibregl-ctrl-scale {
+  background: none; border-color: var(--text-secondary); color: var(--text-secondary);
+  font-size: 10px; line-height: 14px;
+}
