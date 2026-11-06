@@ -193,7 +193,17 @@ def http(
     else:
         log.warning("No AUTH_TOKEN or Cloudflare Access set — the HTTP endpoint is unauthenticated")
 
-    uvicorn.run(app, host=settings.host, port=settings.port, log_level=settings.log_level.lower())
+    # uvicorn 0.36+ builds its own loop: on Windows `loop="auto"` resolves to
+    # ProactorEventLoop and bypasses the selector policy set above, so psycopg
+    # would still fail there. "none" leaves loop creation to asyncio, which
+    # honours that policy; off Windows "auto" keeps uvloop when installed.
+    uvicorn.run(
+        app,
+        host=settings.host,
+        port=settings.port,
+        log_level=settings.log_level.lower(),
+        loop="none" if sys.platform == "win32" else "auto",
+    )
 
 
 @main.command("gen-token")

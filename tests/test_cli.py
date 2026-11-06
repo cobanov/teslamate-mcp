@@ -26,6 +26,7 @@ def _invoke_http(monkeypatch, args: list[str]) -> tuple[object, dict]:
 
     def fake_run(app, **kwargs):
         captured["app"] = app
+        captured["kwargs"] = kwargs
 
     monkeypatch.setattr(cli, "create_server", capture_server)
     monkeypatch.setattr(cli.uvicorn, "run", fake_run)
@@ -44,6 +45,30 @@ def test_http_json_response_flag_starts_cleanly(monkeypatch):
     assert result.exit_code == 0, result.output
     assert captured["mcp"].session_manager.json_response is True
     assert captured["app"] is not None
+
+
+def test_http_leaves_windows_loop_creation_to_the_policy(monkeypatch):
+    """Regression: uvicorn 0.36+ builds a ProactorEventLoop on Windows itself,
+    bypassing the selector policy _configure_event_loop installs, so psycopg's
+    pool cannot connect. "none" tells uvicorn not to replace the policy's loop."""
+    # The policy class itself is Windows-only; this test only covers the kwarg.
+    configured: list[bool] = []
+    monkeypatch.setattr(cli, "_configure_event_loop", lambda: configured.append(True))
+    monkeypatch.setattr(cli.sys, "platform", "win32")
+    result, captured = _invoke_http(monkeypatch, [])
+
+    assert result.exit_code == 0, result.output
+    assert configured == [True]  # the selector policy is still installed first
+    assert captured["kwargs"]["loop"] == "none"
+
+
+def test_http_keeps_uvicorn_loop_autodetection_off_windows(monkeypatch):
+    """Only Windows needs the policy workaround; elsewhere auto keeps uvloop."""
+    monkeypatch.setattr(cli.sys, "platform", "linux")
+    result, captured = _invoke_http(monkeypatch, [])
+
+    assert result.exit_code == 0, result.output
+    assert captured["kwargs"]["loop"] == "auto"
 
 
 def test_http_defaults_to_sse_response(monkeypatch):
