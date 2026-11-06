@@ -214,6 +214,20 @@ def _decode(paths: str) -> list[list[tuple[float, float]]]:
     return drives
 
 
+async def test_driven_roads_keeps_half_located_drives_apart(mcp_session) -> None:
+    """Regression: LEAST/GREATEST ignore NULL, so two drives whose END position
+    was never linked but that start in the same ~500 m cell shared a partition
+    key and the older one was dropped, distance and path included."""
+    async with mcp_session(seeds=["roads"]) as session:
+        rows = await _rows(session, "get_driven_roads", car_name="Rally")
+
+    (row,) = rows
+    # Both one-ended drives are kept; the complete route driven twice (1903 and
+    # 1904, opposite directions) still thins to its newest drive.
+    assert (row["routes"], row["distance_km"]) == (3, 60.0)
+    assert len(_decode(row["paths"])) == 3
+
+
 async def test_driven_roads_paths(mcp_session) -> None:
     async with mcp_session(seeds=["insights"]) as session:
         rows = await _rows(session, "get_driven_roads", car_name=_CAR)
