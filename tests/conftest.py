@@ -700,6 +700,34 @@ FROM base CROSS JOIN (VALUES
 DROP TABLE base;
 """
 
+# Car 19 ("Rally") for get_driven_roads: two drives that start in the same
+# ~500 m cell but whose END position was never linked (end_position_id IS NULL),
+# each with its own GPS track. They are different trips and both must be drawn.
+_ROADS_SQL = """
+INSERT INTO car_settings (id) VALUES (19);
+INSERT INTO cars VALUES (19, 'Rally', 'model3', 'LR', 'White', 'Model 3 LR', 19, 0.15);
+INSERT INTO drives (id, car_id, start_date, end_date, distance, start_position_id,
+    end_position_id)
+VALUES (1901, 19, TIMESTAMP '2025-07-01 10:00', TIMESTAMP '2025-07-01 10:10', 10.0, 19011, NULL),
+       (1902, 19, TIMESTAMP '2025-07-01 11:00', TIMESTAMP '2025-07-01 11:10', 20.0, 19021, NULL),
+       -- A complete route driven twice, to keep the intended thinning covered.
+       (1903, 19, TIMESTAMP '2025-07-01 12:00', TIMESTAMP '2025-07-01 12:10', 30.0, 19031, 19033),
+       (1904, 19, TIMESTAMP '2025-07-01 13:00', TIMESTAMP '2025-07-01 13:10', 30.0, 19041, 19043);
+INSERT INTO positions (id, car_id, date, latitude, longitude, drive_id) VALUES
+    (19011, 19, TIMESTAMP '2025-07-01 10:00', 41.0000, 29.0000, 1901),
+    (19012, 19, TIMESTAMP '2025-07-01 10:05', 41.0020, 29.0020, 1901),
+    (19013, 19, TIMESTAMP '2025-07-01 10:10', 41.0040, 29.0040, 1901),
+    (19021, 19, TIMESTAMP '2025-07-01 11:00', 41.0001, 29.0001, 1902),
+    (19022, 19, TIMESTAMP '2025-07-01 11:05', 41.0030, 29.0030, 1902),
+    (19023, 19, TIMESTAMP '2025-07-01 11:10', 41.0050, 29.0050, 1902),
+    (19031, 19, TIMESTAMP '2025-07-01 12:00', 41.0100, 29.0100, 1903),
+    (19032, 19, TIMESTAMP '2025-07-01 12:05', 41.0150, 29.0150, 1903),
+    (19033, 19, TIMESTAMP '2025-07-01 12:10', 41.0200, 29.0200, 1903),
+    (19041, 19, TIMESTAMP '2025-07-01 13:00', 41.0201, 29.0201, 1904),
+    (19042, 19, TIMESTAMP '2025-07-01 13:05', 41.0150, 29.0150, 1904),
+    (19043, 19, TIMESTAMP '2025-07-01 13:10', 41.0101, 29.0101, 1904);
+"""
+
 _EXTRA_SEEDS = {
     "trips": _TRIP_SQL,
     "states": _STATE_SQL,
@@ -713,6 +741,7 @@ _EXTRA_SEEDS = {
     "gaps": _GAPS_SQL,
     "insights": _INSIGHTS_SQL,
     "medic": _MEDIC_SQL,
+    "roads": _ROADS_SQL,
 }
 
 

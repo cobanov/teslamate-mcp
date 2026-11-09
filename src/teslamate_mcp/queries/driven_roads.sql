@@ -27,10 +27,17 @@ chosen AS (
     FROM (
         SELECT k.*,
             ROW_NUMBER() OVER (
-                -- A drive without position ids is its own route.
+                -- A drive missing either position is its own route: LEAST and
+                -- GREATEST ignore NULLs, so they would key every such drive to
+                -- the one known cell and collapse different trips into one.
                 PARTITION BY k.car_id,
-                    COALESCE(LEAST(k.start_cell, k.end_cell), 'drive ' || k.id),
-                    GREATEST(k.start_cell, k.end_cell)
+                    CASE
+                        WHEN k.start_cell IS NULL OR k.end_cell IS NULL
+                            THEN 'drive ' || k.id
+                        WHEN k.start_cell < k.end_cell
+                            THEN k.start_cell || ':' || k.end_cell
+                        ELSE k.end_cell || ':' || k.start_cell
+                    END
                 ORDER BY k.start_date DESC
             ) AS newest
         FROM keyed k
