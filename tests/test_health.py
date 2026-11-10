@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import psycopg
+
 
 async def _checks(session, **args) -> list[dict]:
     result = await session.call_tool("get_health_checks", args)
@@ -43,3 +45,29 @@ async def test_health_checks_without_data(mcp_session) -> None:
     assert (status["range_loss"], status["parked_drain"]) == ("unknown", "unknown")
     assert status["battery_level"] == "ok"
     assert rows[0]["status"] in {"alert", "warn", "unknown"}
+
+
+async def test_tire_pressure_with_a_missing_sensor_is_unknown(
+    mcp_session, seeded_database
+) -> None:
+    """Three readings cannot produce a spread, so the check must not read as OK."""
+    async with mcp_session(seeds=["medic"]) as session:
+        async with await psycopg.AsyncConnection.connect(
+            seeded_database, autocommit=True
+        ) as conn:
+            await conn.execute(
+                """
+                UPDATE positions
+                SET tpms_pressure_fr = NULL,
+                    tpms_pressure_rl = NULL,
+                    tpms_pressure_rr = NULL
+                WHERE car_id = 18
+                  AND date > now() - interval '7 days'
+                """
+            )
+        rows = await _checks(session, car_name="medic")
+
+    tire = next(r for r in rows if r["check_name"] == "tire_pressure")
+    assert tire["status"] == "unknown"
+    assert tire["value"] is None
+    assert "incomplete" in tire["detail"]
