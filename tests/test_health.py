@@ -47,14 +47,10 @@ async def test_health_checks_without_data(mcp_session) -> None:
     assert rows[0]["status"] in {"alert", "warn", "unknown"}
 
 
-async def test_tire_pressure_with_a_missing_sensor_is_unknown(
-    mcp_session, seeded_database
-) -> None:
+async def test_tire_pressure_with_a_missing_sensor_is_unknown(mcp_session, seeded_database) -> None:
     """Three readings cannot produce a spread, so the check must not read as OK."""
     async with mcp_session(seeds=["medic"]) as session:
-        async with await psycopg.AsyncConnection.connect(
-            seeded_database, autocommit=True
-        ) as conn:
+        async with await psycopg.AsyncConnection.connect(seeded_database, autocommit=True) as conn:
             await conn.execute(
                 """
                 UPDATE positions
