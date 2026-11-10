@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-10
+
+### Fixed
+- **Windows, uvicorn 0.36+**: `teslamate-mcp http` connects to PostgreSQL
+  again. uvicorn 0.36 picks the Proactor event loop itself and ignored the
+  selector policy from 0.17.0 (#16), so the pool never connected; uvicorn now leaves
+  the loop to asyncio on Windows (#18, thanks @PerryLink).
+- **`get_driven_roads`**: two drives that both lack an end position and start
+  in the same cell are no longer merged into one route, so the older one stops
+  disappearing from `routes`, `distance_km` and `paths` (#19, thanks @PerryLink).
+
 ## [0.17.0] - 2026-10-24
 
 ### Added
