@@ -239,13 +239,19 @@ checks AS (
         'tire_pressure',
         CASE
             WHEN t.fl IS NULL THEN 'unknown'
+            WHEN t.fr IS NULL OR t.rl IS NULL OR t.rr IS NULL THEN 'unknown'
             WHEN t.spread >= 0.35 OR t.leak_gap >= 0.25 THEN 'alert'
             WHEN t.spread >= 0.2 OR t.leak_gap >= 0.15 THEN 'warn'
             ELSE 'ok'
         END,
-        ROUND(GREATEST(t.spread, COALESCE(t.leak_gap, 0))::numeric, 2),
+        CASE
+            WHEN t.fl IS NULL OR t.fr IS NULL OR t.rl IS NULL OR t.rr IS NULL THEN NULL
+            ELSE ROUND(GREATEST(t.spread, COALESCE(t.leak_gap, 0))::numeric, 2)
+        END,
         'bar',
         CASE WHEN t.fl IS NULL THEN 'No tire pressure readings.'
+        WHEN t.fr IS NULL OR t.rl IS NULL OR t.rr IS NULL
+            THEN 'Tire pressure readings are incomplete; the spread needs all four tires.'
         ELSE format('Last week of readings: FL %%s, FR %%s, RL %%s, RR %%s bar (spread %%s). '
             'Change from four weeks earlier: FL %%s, FR %%s, RL %%s, RR %%s bar. One tire '
             'dropping more than the others points to a slow leak.',
